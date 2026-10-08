@@ -16,7 +16,7 @@ export class PracticeService {
   constructor(@InjectRepository(Knowledge) private readonly knowledgeRepository: Repository<Knowledge>) {}
 
   async getTags(userId: number) {
-    const notes = await this.knowledgeRepository.find({ where: { userId }, select: { id: true, tags: true } })
+    const notes = await this.knowledgeRepository.find({ where: [{ userId }, { isPublic: true }], select: { id: true, tags: true } })
     return [...new Set(notes.flatMap((note) => note.tags ?? []).map((tag) => String(tag).trim()).filter(Boolean))].sort((a, b) => a.localeCompare(b, 'zh-CN'))
   }
 
