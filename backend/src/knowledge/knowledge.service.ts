@@ -14,11 +14,13 @@ interface CsvKnowledgeRow {
   content?: string
   tags?: string
   isLearned?: string
+  isPublic?: string
   类型?: string
   标题?: string
   内容?: string
   标签?: string
   已学习?: string
+  公开?: string
   [key: string]: string | undefined
 }
 
@@ -46,10 +48,15 @@ export class KnowledgeService {
   }
 
   async findOne(id: number, userId: number) {
-    const knowledge = await this.knowledgeRepository.findOne({ where: { id, userId } })
+    const knowledge = await this.knowledgeRepository.findOne({
+      where: [
+        { id, userId },
+        { id, isPublic: true },
+      ],
+    })
     if (!knowledge) throw new NotFoundException('知识条目不存在')
 
-    await this.knowledgeRepository.increment({ id, userId }, 'views', 1)
+    await this.knowledgeRepository.increment({ id }, 'views', 1)
     knowledge.views += 1
     return knowledge
   }
@@ -83,7 +90,7 @@ export class KnowledgeService {
 
   async getTags(userId: number) {
     const items = await this.knowledgeRepository.find({
-      where: { userId },
+      where: [{ userId }, { isPublic: true }],
       select: { id: true, tags: true },
     })
 
@@ -109,6 +116,7 @@ export class KnowledgeService {
       content: item.content,
       tags: (item.tags ?? []).join('|'),
       isLearned: item.isLearned ? 'true' : 'false',
+      isPublic: item.isPublic ? 'true' : 'false',
       views: String(item.views ?? 0),
       createdAt: item.createdAt?.toISOString() ?? '',
       updatedAt: item.updatedAt?.toISOString() ?? '',
@@ -116,7 +124,7 @@ export class KnowledgeService {
 
     const csv = stringify(records, {
       header: true,
-      columns: ['type', 'title', 'content', 'tags', 'isLearned', 'views', 'createdAt', 'updatedAt'],
+      columns: ['type', 'title', 'content', 'tags', 'isLearned', 'isPublic', 'views', 'createdAt', 'updatedAt'],
     })
 
     return `\uFEFF${csv}`
@@ -160,6 +168,8 @@ export class KnowledgeService {
       )
       const learnedValue = String(row.isLearned ?? row['已学习'] ?? '').toLowerCase()
       const isLearned = ['true', '1', 'yes', '是', '已学习'].includes(learnedValue)
+      const publicValue = String(row.isPublic ?? row['公开'] ?? '').toLowerCase()
+      const isPublic = ['true', '1', 'yes', '是', '公开', '公共', 'public'].includes(publicValue)
 
       validItems.push(
         this.knowledgeRepository.create({
@@ -168,6 +178,7 @@ export class KnowledgeService {
           content,
           tags,
           isLearned,
+          isPublic,
           userId,
         }),
       )
@@ -181,18 +192,19 @@ export class KnowledgeService {
   private buildWhere(
     userId: number,
     query: Partial<QueryKnowledgeDto>,
-  ): FindOptionsWhere<Knowledge> | FindOptionsWhere<Knowledge>[] {
-    const base: FindOptionsWhere<Knowledge> = { userId }
-    if (query.type) base.type = query.type
-    if (query.tag) base.tags = Like(`%${query.tag}%`)
+  ): FindOptionsWhere<Knowledge>[] {
+    const filters: FindOptionsWhere<Knowledge> = {}
+    if (query.type) filters.type = query.type
+    if (query.tag) filters.tags = Like(`%${query.tag}%`)
 
+    const scopes: FindOptionsWhere<Knowledge>[] = [{ userId }, { isPublic: true }]
     const keyword = query.keyword?.trim()
-    if (!keyword) return base
+    if (!keyword) return scopes.map((scope) => ({ ...scope, ...filters }))
 
-    return [
-      { ...base, title: Like(`%${keyword}%`) },
-      { ...base, content: Like(`%${keyword}%`) },
-    ]
+    return scopes.flatMap((scope) => [
+      { ...scope, ...filters, title: Like(`%${keyword}%`) },
+      { ...scope, ...filters, content: Like(`%${keyword}%`) },
+    ])
   }
 
   private normalizeTags(tags?: string[]) {

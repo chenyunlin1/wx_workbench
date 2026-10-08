@@ -3,6 +3,7 @@ import { Transform } from 'class-transformer'
 import {
   ArrayMaxSize,
   IsArray,
+  IsBoolean,
   IsEnum,
   IsNotEmpty,
   IsOptional,
@@ -38,4 +39,9 @@ export class CreateKnowledgeDto {
       : [],
   )
   tags?: string[]
+
+  @ApiPropertyOptional({ example: false, description: '是否为公共知识（所有账号可见）' })
+  @IsOptional()
+  @IsBoolean()
+  isPublic?: boolean
 }

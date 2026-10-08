@@ -33,6 +33,9 @@ export class Knowledge {
   @Column({ name: 'is_learned', type: 'boolean', default: false })
   isLearned: boolean
 
+  @Column({ name: 'is_public', type: 'boolean', default: false })
+  isPublic: boolean
+
   @Column({ type: 'int', default: 0 })
   views: number
 

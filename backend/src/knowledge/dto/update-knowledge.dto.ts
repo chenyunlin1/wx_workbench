@@ -37,4 +37,9 @@ export class UpdateKnowledgeDto {
   @IsOptional()
   @IsBoolean()
   isLearned?: boolean
+
+  @ApiPropertyOptional({ example: false, description: '是否为公共知识（所有账号可见）' })
+  @IsOptional()
+  @IsBoolean()
+  isPublic?: boolean
 }

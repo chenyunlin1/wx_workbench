@@ -73,12 +73,12 @@ export class PracticeService {
     return this.shuffle([correctAnswer, ...distractors])
   }
 
-  private buildWhere(userId: number, range: string): FindOptionsWhere<Knowledge> {
-    const where: FindOptionsWhere<Knowledge> = { userId }
-    if (range === 'learned') where.isLearned = true
-    else if (range === 'unlearned') where.isLearned = false
-    else if (range && range !== 'all') where.tags = Like(`%${range}%`)
-    return where
+  private buildWhere(userId: number, range: string): FindOptionsWhere<Knowledge>[] {
+    const filters: FindOptionsWhere<Knowledge> = {}
+    if (range === 'learned') filters.isLearned = true
+    else if (range === 'unlearned') filters.isLearned = false
+    else if (range && range !== 'all') filters.tags = Like(`%${range}%`)
+    return [{ userId, ...filters }, { isPublic: true, ...filters }]
   }
 
   private shuffle<T>(items: T[]) {
