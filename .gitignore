@@ -1,0 +1,11 @@
+node_modules/
+dist/
+.env
+*.local
+*.log
+.DS_Store
+coverage/
+.vscode/
+.idea/
+shots/
+tmp/

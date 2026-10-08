@@ -1,0 +1,20 @@
+{
+  "string": [
+    {
+      "name": "module_desc",
+      "value": "LifeOS 工作台鸿蒙客户端"
+    },
+    {
+      "name": "EntryAbility_desc",
+      "value": "LifeOS 工作台主入口"
+    },
+    {
+      "name": "EntryAbility_label",
+      "value": "LifeOS 工作台"
+    },
+    {
+      "name": "mic_reason",
+      "value": "用于 AI 助手的语音输入，把说的话转成文字"
+    }
+  ]
+}
