@@ -1187,11 +1187,6 @@ onBeforeUnmount(stopPolling)
   text-align: center;
 }
 
-.plan-list {
-  display: grid;
-  gap: 10px;
-}
-
 .plan-row {
   display: grid;
   grid-template-columns: 52px minmax(0, 1fr) auto;
@@ -1314,7 +1309,8 @@ onBeforeUnmount(stopPolling)
   background: var(--primary-soft);
 }
 
-.record-list {
+.record-list,
+.plan-list {
   display: grid;
   gap: 10px;
   max-height: 420px;
