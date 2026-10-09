@@ -218,7 +218,7 @@ export function parseInline(raw: string, size: number, bold: boolean, color: str
   return spans
 }
 
-/** `| a | b |` → ['a', 'b']；首尾竖线是装饰，不属于单元格 */
+/** `| a | b |` → ['a', 'b']；首尾竖线是外框不算单元格，行内代码里的 | 也不拆列 */
 function splitCells(line: string): string[] {
   let text = line.trim()
   if (text.startsWith('|')) {
@@ -227,11 +227,33 @@ function splitCells(line: string): string[] {
   if (text.endsWith('|')) {
     text = text.substring(0, text.length - 1)
   }
-  const raw = text.split('|')
   const cells: string[] = []
-  for (const cell of raw) {
-    cells.push(cell.trim())
+  let buffer = ''
+  let inCode = false
+  let i = 0
+  while (i < text.length) {
+    const ch = text.charAt(i)
+    if (ch === '\\' && text.charAt(i + 1) === '|') {
+      buffer += '|'
+      i += 2
+      continue
+    }
+    if (ch === '`') {
+      inCode = !inCode
+      buffer += ch
+      i += 1
+      continue
+    }
+    if (ch === '|' && !inCode) {
+      cells.push(buffer.trim())
+      buffer = ''
+      i += 1
+      continue
+    }
+    buffer += ch
+    i += 1
   }
+  cells.push(buffer.trim())
   return cells
 }
 
