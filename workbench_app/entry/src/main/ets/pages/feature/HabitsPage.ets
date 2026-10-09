@@ -404,18 +404,19 @@ export struct HabitsPage {
       .onRefreshing(() => {
         this.reload()
       })
+      // 体重 sheet 挂在此节点：根节点已挂习惯 sheet，同一节点链式多 sheet 会互相覆盖
+      .bindSheet($$this.showWeightForm, this.weightFormBuilder(), {
+        height: 460,
+        dragBar: true,
+        preferType: SheetType.BOTTOM,
+        backgroundColor: AppMaterial.SheetBackground,
+        blurStyle: AppMaterial.SheetBlur,
+        systemMaterial: AppMaterial.Sheet
+      })
     }
     .width('100%')
     .height('100%')
     .backgroundColor($r('sys.color.background_primary'))
-    .bindSheet($$this.showWeightForm, this.weightFormBuilder(), {
-      height: 460,
-      dragBar: true,
-      preferType: SheetType.BOTTOM,
-      backgroundColor: AppMaterial.SheetBackground,
-      blurStyle: AppMaterial.SheetBlur,
-      systemMaterial: AppMaterial.Sheet
-    })
     // 习惯表单
     .bindSheet($$this.showHabitForm, this.habitFormBuilder(), {
       height: 460,

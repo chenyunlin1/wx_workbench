@@ -49,8 +49,7 @@ export struct WorkoutPage {
     })
     const query: Record<string, string> = {
       'page': '1',
-      'pageSize': '50',
-      'days': this.days().toString()
+      'pageSize': '50'
     }
     Api.listWorkouts(query).then((result: WorkoutListResult) => {
       this.workouts = result.items
