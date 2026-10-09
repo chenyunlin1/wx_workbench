@@ -10,7 +10,7 @@ import { common } from '@kit.AbilityKit'
 import { KeyboardAvoidMode } from '@kit.ArkUI'
 import { SpeechInput } from '../../common/SpeechInput'
 import { actionStateLabel, AI_TOOL_NAMES, runAiAction } from '../../common/AiActions'
-import { MdSpan, parseMarkdown } from '../../common/Markdown'
+import { MdBlock, MdSpan, MdTable, mdBlockSignature, mdCellSignature, mdRowSignature, parseBlocks } from '../../common/Markdown'
 import { AiAction, AiActionField, AiConversationSummary, AiSettingsPayload } from '../../model/Models'
 import { Chip, EmptyView, OptionChips, PAGE_PAD_H, PillButton, SHEET_PAD_BOTTOM, SHEET_PAD_TOP, SheetHeader } from '../../components/Ui'
 
@@ -387,8 +387,8 @@ export struct AiTab {
   }
 
   /** AI 回复按 markdown 排版，用户自己说的话保持原样 */
-  private mdSpans(msg: ChatMsg): MdSpan[] {
-    return parseMarkdown(this.bubbleText(msg), 14)
+  private mdBlocks(msg: ChatMsg): MdBlock[] {
+    return parseBlocks(this.bubbleText(msg), 14)
   }
 
   private actionStateColor(status: string): ResourceColor {
@@ -505,6 +505,64 @@ export struct AiTab {
     })
   }
 
+  /** 一段 markdown 文本：行内语法都在 Span 上，容器只给默认字色字号 */
+  @Builder
+  mdText(spans: MdSpan[]) {
+    Text() {
+      ForEach(spans, (span: MdSpan) => {
+        Span(span.text)
+          .fontSize(span.size)
+          .fontWeight(span.bold ? FontWeight.Bold : FontWeight.Normal)
+          .fontColor(span.color.length > 0 ? span.color : $r('sys.color.font_primary'))
+          .fontFamily(span.code ? 'monospace,HarmonyOS Sans' : 'HarmonyOS Sans')
+          .textBackgroundStyle({
+            color: span.code ? AppColor.BrandSoft : Color.Transparent,
+            radius: 4
+          })
+      }, (span: MdSpan, index: number) => index.toString() + '-' + span.text)
+    }
+    .fontSize(AppFont.Body)
+    .fontColor($r('sys.color.font_primary'))
+    .width('100%')
+  }
+
+  @Builder
+  mdTableCell(cell: MdSpan[], last: boolean) {
+    Column() {
+      this.mdText(cell)
+    }
+    .layoutWeight(1)
+    .padding({ left: 8, right: 8, top: 5, bottom: 5 })
+    .border({ width: { right: last ? 0 : 1 }, color: Theme.BORDER })
+  }
+
+  @Builder
+  mdTableRow(cells: MdSpan[][], header: boolean) {
+    Row() {
+      ForEach(cells, (cell: MdSpan[], index: number) => {
+        this.mdTableCell(cell, index === cells.length - 1)
+      }, (cell: MdSpan[], index: number) => index.toString() + '-' + mdCellSignature(cell))
+    }
+    .width('100%')
+    .alignItems(VerticalAlign.Top)
+    .backgroundColor(header ? AppColor.BrandSoft : Color.Transparent)
+    .border({ width: { bottom: 1 }, color: Theme.BORDER })
+  }
+
+  @Builder
+  mdTable(table: MdTable) {
+    Column() {
+      this.mdTableRow(table.header, true)
+      ForEach(table.rows, (row: MdSpan[][]) => {
+        this.mdTableRow(row, false)
+      }, (row: MdSpan[][], index: number) => index.toString() + '-' + mdRowSignature(row))
+    }
+    .width('100%')
+    .border({ width: 1, color: Theme.BORDER })
+    .borderRadius(8)
+    .clip(true)
+  }
+
   @Builder
   msgBubble(msg: ChatMsg) {
     Row() {
@@ -518,23 +576,20 @@ export struct AiTab {
             .fontColor(AppColor.OnBrand)
             .lineHeight(21)
         } else {
-          // SDK 没有内置 Markdown 组件，只能把语法拆成 Span 交给 Text 排版
-          Text() {
-            ForEach(this.mdSpans(msg), (span: MdSpan) => {
-              Span(span.text)
-                .fontSize(span.size)
-                .fontWeight(span.bold ? FontWeight.Bold : FontWeight.Normal)
-                .fontColor(span.color.length > 0 ? span.color : $r('sys.color.font_primary'))
-                .fontFamily(span.code ? 'monospace,HarmonyOS Sans' : 'HarmonyOS Sans')
-                .textBackgroundStyle({
-                  color: span.code ? AppColor.BrandSoft : Color.Transparent,
-                  radius: 4
-                })
-            }, (span: MdSpan, index: number) => index.toString() + '-' + span.text)
+          // 表格在 Text 的 Span 里排不出来，所以先切块：段落走 Text，表格/分隔线单独成型
+          Column({ space: 6 }) {
+            ForEach(this.mdBlocks(msg), (block: MdBlock, index: number) => {
+              if (block.kind === 'table') {
+                this.mdTable(block.table)
+              } else if (block.kind === 'divider') {
+                Divider().color(Theme.BORDER)
+              } else {
+                this.mdText(block.spans)
+              }
+            }, (block: MdBlock, index: number) => index.toString() + '-' + mdBlockSignature(block))
           }
-          .fontSize(AppFont.Body)
-          .fontColor($r('sys.color.font_primary'))
           .width('100%')
+          .alignItems(HorizontalAlign.Start)
         }
         if (msg.error.length > 0) {
           Text('⚠ ' + msg.error)
