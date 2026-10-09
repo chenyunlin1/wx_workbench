@@ -187,7 +187,7 @@ export struct FinancePage {
                       .fontColor(Theme.SUCCESS)
                   }
                   .layoutWeight(1)
-                  .alignItems(HorizontalAlign.Start)
+                  .alignItems(HorizontalAlign.Center)
                   Column({ space: 4 }) {
                     Text('支出')
                       .fontSize(11)
@@ -198,7 +198,7 @@ export struct FinancePage {
                       .fontColor(Theme.DANGER)
                   }
                   .layoutWeight(1)
-                  .alignItems(HorizontalAlign.Start)
+                  .alignItems(HorizontalAlign.Center)
                   Column({ space: 4 }) {
                     Text('结余')
                       .fontSize(11)
@@ -209,7 +209,7 @@ export struct FinancePage {
                       .fontColor(AppColor.Brand)
                   }
                   .layoutWeight(1)
-                  .alignItems(HorizontalAlign.Start)
+                  .alignItems(HorizontalAlign.Center)
                 }
                 .width('100%')
               }
