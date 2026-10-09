@@ -18,8 +18,9 @@
 /preview
 **/.preview/
 
-# 本地签名与产物
+# 本地签名与产物（build-profile.json5 含本机签名；提交基准见 build-profile.template.json5）
 /signing/
+/build-profile.json5
 /*.hap
 /artifacts/
 
