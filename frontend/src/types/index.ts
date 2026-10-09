@@ -155,6 +155,8 @@ export interface KnowledgeItem {
   content: string
   tags: string[]
   isLearned: boolean
+  isPublic: boolean
+  userId: number
   views: number
   createdAt: string
   updatedAt: string

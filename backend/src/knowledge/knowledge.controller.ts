@@ -10,6 +10,7 @@ import {
 import type { Response } from 'express'
 import { CurrentUser } from '../common/decorators/current-user.decorator'
 import { RawResponse } from '../common/decorators/raw-response.decorator'
+import { UserRole } from '../entities/enums'
 import { CreateKnowledgeDto } from './dto/create-knowledge.dto'
 import { QueryKnowledgeDto } from './dto/query-knowledge.dto'
 import { UpdateKnowledgeDto } from './dto/update-knowledge.dto'
@@ -85,14 +86,19 @@ export class KnowledgeController {
   update(
     @Param('id', ParseIntPipe) id: number,
     @CurrentUser('id') userId: number,
+    @CurrentUser('role') role: UserRole,
     @Body() dto: UpdateKnowledgeDto,
   ) {
-    return this.knowledgeService.update(id, userId, dto)
+    return this.knowledgeService.update(id, userId, dto, role === UserRole.ADMIN)
   }
 
   @Delete(':id')
   @ApiOperation({ summary: '删除知识条目' })
-  remove(@Param('id', ParseIntPipe) id: number, @CurrentUser('id') userId: number) {
-    return this.knowledgeService.remove(id, userId)
+  remove(
+    @Param('id', ParseIntPipe) id: number,
+    @CurrentUser('id') userId: number,
+    @CurrentUser('role') role: UserRole,
+  ) {
+    return this.knowledgeService.remove(id, userId, role === UserRole.ADMIN)
   }
 }

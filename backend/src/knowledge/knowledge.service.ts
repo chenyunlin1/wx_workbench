@@ -70,9 +70,8 @@ export class KnowledgeService {
     return this.knowledgeRepository.save(knowledge)
   }
 
-  async update(id: number, userId: number, dto: UpdateKnowledgeDto) {
-    const knowledge = await this.knowledgeRepository.findOne({ where: { id, userId } })
-    if (!knowledge) throw new NotFoundException('知识条目不存在')
+  async update(id: number, userId: number, dto: UpdateKnowledgeDto, isAdmin = false) {
+    const knowledge = await this.findManageable(id, userId, isAdmin)
 
     Object.assign(knowledge, {
       ...dto,
@@ -81,11 +80,20 @@ export class KnowledgeService {
     return this.knowledgeRepository.save(knowledge)
   }
 
-  async remove(id: number, userId: number) {
-    const knowledge = await this.knowledgeRepository.findOne({ where: { id, userId } })
-    if (!knowledge) throw new NotFoundException('知识条目不存在')
+  async remove(id: number, userId: number, isAdmin = false) {
+    const knowledge = await this.findManageable(id, userId, isAdmin)
     await this.knowledgeRepository.remove(knowledge)
     return { success: true }
+  }
+
+  /** 个人条目归创建者管理；公共条目额外允许管理员编辑删除 */
+  private async findManageable(id: number, userId: number, isAdmin: boolean) {
+    const knowledge = await this.knowledgeRepository.findOne({ where: { id } })
+    if (!knowledge) throw new NotFoundException('知识条目不存在')
+
+    const manageable = knowledge.userId === userId || (isAdmin && knowledge.isPublic)
+    if (!manageable) throw new NotFoundException('知识条目不存在')
+    return knowledge
   }
 
   async getTags(userId: number) {

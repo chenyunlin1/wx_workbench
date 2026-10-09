@@ -42,6 +42,22 @@ export struct KnowledgeDetailPage {
     return type === 'qa' ? '问答' : '笔记'
   }
 
+  /** 个人条目归创建者管理；公共条目额外允许管理员操作 */
+  private canManage(): boolean {
+    const item = this.item
+    if (item === null) {
+      return false
+    }
+    const me = Session.user
+    if (me === null) {
+      return false
+    }
+    if (item.userId === me.id) {
+      return true
+    }
+    return Session.isAdmin() && item.isPublic === true
+  }
+
   private toggleLearned(): void {
     if (this.item === null) {
       return
@@ -121,7 +137,7 @@ export struct KnowledgeDetailPage {
         PageHeader({
           navStack: this.nav,
           title: '知识详情',
-          actionLabel: '编辑',
+          actionLabel: this.canManage() ? '编辑' : '',
           onAction: (): void => {
             this.openEdit()
           }
@@ -198,32 +214,34 @@ export struct KnowledgeDetailPage {
                 .width('100%')
               }
 
-              Row({ space: 10 }) {
-                Text(this.item.isLearned ? '标记未学' : '标记已学')
-                  .fontSize(13)
-                  .fontColor(AppColor.Brand)
-                  .layoutWeight(1)
-                  .textAlign(TextAlign.Center)
-                  .height(42)
-                  .borderRadius(AppRadius.Pill)
-                  .border({ width: 1, color: AppColor.Brand })
-                  .onClick(() => {
-                    this.toggleLearned()
-                  })
-                Text('删除')
-                  .fontSize(13)
-                  .fontColor(Theme.DANGER)
-                  .layoutWeight(1)
-                  .textAlign(TextAlign.Center)
-                  .height(42)
-                  .borderRadius(AppRadius.Pill)
-                  .border({ width: 1, color: Theme.DANGER })
-                  .onClick(() => {
-                    this.removeCurrent()
-                  })
+              if (this.canManage()) {
+                Row({ space: 10 }) {
+                  Text(this.item.isLearned ? '标记未学' : '标记已学')
+                    .fontSize(13)
+                    .fontColor(AppColor.Brand)
+                    .layoutWeight(1)
+                    .textAlign(TextAlign.Center)
+                    .height(42)
+                    .borderRadius(AppRadius.Pill)
+                    .border({ width: 1, color: AppColor.Brand })
+                    .onClick(() => {
+                      this.toggleLearned()
+                    })
+                  Text('删除')
+                    .fontSize(13)
+                    .fontColor(Theme.DANGER)
+                    .layoutWeight(1)
+                    .textAlign(TextAlign.Center)
+                    .height(42)
+                    .borderRadius(AppRadius.Pill)
+                    .border({ width: 1, color: Theme.DANGER })
+                    .onClick(() => {
+                      this.removeCurrent()
+                    })
+                }
+                .width('100%')
+                .margin({ top: 4, bottom: 12 })
               }
-              .width('100%')
-              .margin({ top: 4, bottom: 12 })
             }
             .padding({ bottom: PAGE_SCROLL_BOTTOM })
             .constraintSize({ minHeight: '100%' })

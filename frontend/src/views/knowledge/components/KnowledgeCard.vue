@@ -6,6 +6,7 @@ import type { KnowledgeItem } from '@/types'
 const props = defineProps<{
   item: KnowledgeItem
   selected: boolean
+  canManage: boolean
 }>()
 
 const emit = defineEmits<{
@@ -33,7 +34,7 @@ const onSelect = (value: string | number | boolean) => {
         <el-icon><CollectionTag v-if="item.type === 'note'" /><QuestionFilled v-else /></el-icon>
         {{ item.type === 'note' ? '✨ 笔记' : '❓ 问答' }}
       </span>
-      <button class="learned-toggle" :class="{ learned: item.isLearned }" @click="emit('toggleLearned', item)">
+      <button v-if="canManage" class="learned-toggle" :class="{ learned: item.isLearned }" @click="emit('toggleLearned', item)">
         <el-icon><CircleCheck v-if="item.isLearned" /><CircleClose v-else /></el-icon>
         {{ item.isLearned ? '● 已学习' : '○ 标记已学习' }}
       </button>

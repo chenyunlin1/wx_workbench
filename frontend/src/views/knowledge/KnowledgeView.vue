@@ -1,23 +1,27 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
 import { useRoute } from 'vue-router'
-import { ElMessage, type UploadFile } from 'element-plus'
-import { Check, DataAnalysis, Plus, Search, Upload } from '@element-plus/icons-vue'
+import { ElMessage, ElMessageBox, type UploadFile } from 'element-plus'
+import { Check, DataAnalysis, Delete, EditPen, Plus, Search, Upload } from '@element-plus/icons-vue'
 import {
   createKnowledge,
+  deleteKnowledge,
   exportKnowledgeCsv,
   getKnowledgeDetail,
   getKnowledgeTags,
   importKnowledgeCsv,
   listKnowledge,
   toggleKnowledgeLearned,
+  updateKnowledge,
 } from '@/api/knowledge'
 import KnowledgeCard from './components/KnowledgeCard.vue'
 import NoteEditorDialog from './components/NoteEditorDialog.vue'
 import TagCloud from './components/TagCloud.vue'
+import { useUserStore } from '@/stores/user'
 import type { KnowledgeItem, KnowledgePayload, KnowledgeSortBy, KnowledgeType } from '@/types'
 
 const route = useRoute()
+const userStore = useUserStore()
 
 const FIXED_TAGS = ['Vue3', 'React', 'TypeScript', 'JavaScript', 'CSS/SCSS', 'HTML5', 'Vite', 'Pinia', 'Element Plus', 'NestJS', 'Node.js', 'TypeORM', 'MySQL', 'Redis', 'Docker', '微服务', '前端工程化', '性能优化']
 const items = ref<KnowledgeItem[]>([])
@@ -40,6 +44,14 @@ const submitting = ref(false)
 const importing = ref(false)
 const importFile = ref<File | null>(null)
 const detailItem = ref<KnowledgeItem | null>(null)
+const editingItem = ref<KnowledgeItem | null>(null)
+
+/** 个人条目归创建者管理；公共条目额外允许管理员编辑删除 */
+const canManage = (item: KnowledgeItem): boolean => {
+  const me = userStore.user
+  if (!me) return false
+  return item.userId === me.id || (userStore.isAdmin && item.isPublic)
+}
 
 const stats = computed(() => ({
   total: total.value,
@@ -98,8 +110,9 @@ const handleToggleLearned = async (item: KnowledgeItem) => {
 }
 
 const batchCheckIn = async () => {
-  const targets = items.value.filter((item) => selectedIds.value.includes(item.id) && !item.isLearned)
-  if (!targets.length) { ElMessage.info(selectedIds.value.length ? '所选内容均已学习' : '请先选择要打卡的内容'); return }
+  const selected = items.value.filter((item) => selectedIds.value.includes(item.id))
+  const targets = selected.filter((item) => !item.isLearned && canManage(item))
+  if (!targets.length) { ElMessage.info(selected.length ? '所选内容均已学习或不可操作' : '请先选择要打卡的内容'); return }
   await Promise.all(targets.map((item) => toggleKnowledgeLearned(item.id, true)))
   targets.forEach((item) => (item.isLearned = true))
   ElMessage.success(`已完成 ${targets.length} 条学习打卡`)
@@ -112,12 +125,48 @@ const openDetail = async (item: KnowledgeItem) => {
   detailDialogVisible.value = true
 }
 
-const createNote = async (payload: KnowledgePayload & { type: KnowledgeType; title: string; content: string }) => {
+const openCreateDialog = () => {
+  editingItem.value = null
+  noteDialogVisible.value = true
+}
+
+const openEditDialog = () => {
+  if (!detailItem.value) return
+  editingItem.value = detailItem.value
+  noteDialogVisible.value = true
+}
+
+const removeDetail = async () => {
+  const target = detailItem.value
+  if (!target) return
+  try {
+    await ElMessageBox.confirm(`确定删除「${target.title}」吗？删除后不可恢复。`, '删除知识条目', {
+      type: 'warning',
+      confirmButtonText: '删除',
+      cancelButtonText: '取消',
+    })
+  } catch {
+    return
+  }
+  await deleteKnowledge(target.id)
+  ElMessage.success('已删除')
+  detailDialogVisible.value = false
+  await Promise.all([loadFirstPage(), loadTags()])
+}
+
+const submitNote = async (payload: KnowledgePayload & { type: KnowledgeType; title: string; content: string }) => {
   submitting.value = true
   try {
-    await createKnowledge(payload)
+    if (editingItem.value) {
+      const updated = await updateKnowledge(editingItem.value.id, payload)
+      detailItem.value = updated
+      ElMessage.success('知识条目已更新')
+    } else {
+      await createKnowledge(payload)
+      ElMessage.success('知识笔记已保存')
+    }
     noteDialogVisible.value = false
-    ElMessage.success('知识笔记已保存')
+    editingItem.value = null
     await Promise.all([loadFirstPage(), loadTags()])
   } finally { submitting.value = false }
 }
@@ -167,7 +216,7 @@ onMounted(async () => {
         <el-button @click="importDialogVisible = true">导入 CSV</el-button>
         <el-button @click="downloadCsv">导出 CSV</el-button>
         <el-button @click="batchCheckIn"><el-icon><Check /></el-icon>打卡</el-button>
-        <el-button type="primary" @click="noteDialogVisible = true"><el-icon><Plus /></el-icon>记笔记</el-button>
+        <el-button type="primary" @click="openCreateDialog"><el-icon><Plus /></el-icon>记笔记</el-button>
       </div>
     </header>
 
@@ -223,6 +272,7 @@ onMounted(async () => {
         :key="item.id"
         :item="item"
         :selected="selectedIds.includes(item.id)"
+        :can-manage="canManage(item)"
         @select="handleSelect"
         @toggle-learned="handleToggleLearned"
         @open="openDetail"
@@ -232,7 +282,7 @@ onMounted(async () => {
       <div v-else-if="finished && items.length" class="list-status">已经到底了 · 共 {{ total }} 条</div>
     </div>
 
-    <NoteEditorDialog v-model="noteDialogVisible" :tag-options="tags" :loading="submitting" @submit="createNote" />
+    <NoteEditorDialog v-model="noteDialogVisible" :tag-options="tags" :item="editingItem" :loading="submitting" @submit="submitNote" />
 
     <el-dialog v-model="importDialogVisible" title="导入 CSV" width="min(92vw, 560px)" append-to-body>
       <el-upload drag action="#" accept=".csv,text/csv" :auto-upload="false" :limit="1" :on-change="handleImportFile" :on-remove="handleImportRemove">
@@ -260,6 +310,7 @@ onMounted(async () => {
       <div v-if="detailItem" class="detail-content">
         <div class="detail-meta">
           <el-tag :type="detailItem.type === 'note' ? 'primary' : 'warning'" effect="light">{{ detailItem.type === 'note' ? '✨ 笔记' : '❓ 问答' }}</el-tag>
+          <el-tag v-if="detailItem.isPublic" type="success" effect="light">公共</el-tag>
           <span>{{ detailItem.views }} 次点击</span>
           <span>{{ new Date(detailItem.updatedAt).toLocaleDateString('zh-CN') }}</span>
         </div>
@@ -267,6 +318,12 @@ onMounted(async () => {
         <div class="detail-text">{{ detailItem.content }}</div>
         <div class="detail-tags"><el-tag v-for="tag in detailItem.tags" :key="tag" effect="light" round>{{ tag }}</el-tag></div>
       </div>
+      <template #footer>
+        <div v-if="detailItem && canManage(detailItem)" class="detail-actions">
+          <el-button @click="openEditDialog"><el-icon><EditPen /></el-icon>编辑</el-button>
+          <el-button type="danger" @click="removeDetail"><el-icon><Delete /></el-icon>删除</el-button>
+        </div>
+      </template>
     </el-dialog>
   </section>
 </template>
@@ -299,6 +356,7 @@ onMounted(async () => {
 .detail-content h3 { margin: 17px 0 12px; color: var(--text-primary); font-size: 21px; line-height: 1.5; }
 .detail-text { padding: 16px; border: 1px solid var(--border-soft); border-radius: 12px; color: var(--text-regular); background: var(--surface-muted); font-size: 14px; line-height: 1.9; white-space: pre-wrap; }
 .detail-tags { margin-top: 15px; }
+.detail-actions { display: flex; justify-content: flex-end; }
 @media (max-width: 1080px) {
   .page-toolbar { align-items: flex-start; flex-direction: column; }
   .toolbar-actions { justify-content: flex-start; }

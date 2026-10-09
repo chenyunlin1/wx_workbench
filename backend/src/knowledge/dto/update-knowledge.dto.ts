@@ -4,12 +4,19 @@ import {
   ArrayMaxSize,
   IsArray,
   IsBoolean,
+  IsEnum,
   IsOptional,
   IsString,
   MaxLength,
 } from 'class-validator'
+import { KnowledgeType } from '../knowledge.entity'
 
 export class UpdateKnowledgeDto {
+  @ApiPropertyOptional({ enum: KnowledgeType, example: KnowledgeType.NOTE })
+  @IsOptional()
+  @IsEnum(KnowledgeType, { message: '类型只能是 note 或 qa' })
+  type?: KnowledgeType
+
   @ApiPropertyOptional({ example: '更新后的标题' })
   @IsOptional()
   @IsString()

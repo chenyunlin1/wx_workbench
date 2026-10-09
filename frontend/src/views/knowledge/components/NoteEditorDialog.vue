@@ -1,11 +1,11 @@
 <script setup lang="ts">
-import { reactive, ref, watch } from 'vue'
+import { computed, reactive, ref, watch } from 'vue'
 import type { FormInstance, FormRules } from 'element-plus'
 import { EditPen, Plus } from '@element-plus/icons-vue'
-import type { KnowledgePayload, KnowledgeType } from '@/types'
+import type { KnowledgeItem, KnowledgePayload, KnowledgeType } from '@/types'
 
 const visible = defineModel<boolean>({ required: true })
-const props = defineProps<{ tagOptions: string[]; loading?: boolean }>()
+const props = defineProps<{ tagOptions: string[]; loading?: boolean; item?: KnowledgeItem | null }>()
 const emit = defineEmits<{
   submit: [payload: KnowledgePayload & { type: KnowledgeType; title: string; content: string }]
 }>()
@@ -28,16 +28,28 @@ const rules: FormRules<NoteForm> = {
   content: [{ required: true, message: '请输入内容', trigger: 'blur' }],
 }
 
-const reset = () => {
-  form.type = 'note'
-  form.title = ''
-  form.content = ''
-  form.tags = []
+const isEditing = computed(() => Boolean(props.item))
+const dialogTitle = computed(() => (isEditing.value ? '编辑知识条目' : '记一条知识笔记'))
+const dialogSubtitle = computed(() => (isEditing.value ? '修改后保存即可生效' : '把零散知识沉淀成可检索的卡片'))
+
+const fillForm = () => {
+  const item = props.item
+  if (item) {
+    form.type = item.type
+    form.title = item.title
+    form.content = item.content
+    form.tags = [...item.tags]
+  } else {
+    form.type = 'note'
+    form.title = ''
+    form.content = ''
+    form.tags = []
+  }
   formRef.value?.clearValidate()
 }
 
 watch(visible, (opened) => {
-  if (opened) reset()
+  if (opened) fillForm()
 })
 
 const submit = async () => {
@@ -55,7 +67,7 @@ const submit = async () => {
 <template>
   <el-dialog
     v-model="visible"
-    title="记一条知识笔记"
+    :title="dialogTitle"
     width="min(92vw, 660px)"
     append-to-body
     destroy-on-close
@@ -65,8 +77,8 @@ const submit = async () => {
       <div class="dialog-heading">
         <span class="dialog-icon"><el-icon><EditPen /></el-icon></span>
         <div>
-          <strong>记一条知识笔记</strong>
-          <small>把零散知识沉淀成可检索的卡片</small>
+          <strong>{{ dialogTitle }}</strong>
+          <small>{{ dialogSubtitle }}</small>
         </div>
       </div>
     </template>
@@ -106,7 +118,7 @@ const submit = async () => {
       <el-button @click="visible = false">取消</el-button>
       <el-button type="primary" :loading="loading" @click="submit">
         <el-icon><Plus /></el-icon>
-        保存笔记
+        {{ isEditing ? '保存修改' : '保存笔记' }}
       </el-button>
     </template>
   </el-dialog>
