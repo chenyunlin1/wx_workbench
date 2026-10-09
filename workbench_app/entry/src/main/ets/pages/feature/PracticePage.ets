@@ -331,7 +331,7 @@ export struct PracticePage {
             .backgroundColor(AppColor.Brand)
             .width((this.questions.length === 0 ? 0 : (this.current + 1) / this.questions.length * 100) + '%')
         }
-        .width('100%')
+        .layoutWeight(1)
         .height(5)
       }
       .width('100%')
@@ -466,6 +466,7 @@ export struct PracticePage {
           }
         }
         .padding({ bottom: PAGE_SCROLL_BOTTOM })
+        .constraintSize({ minHeight: '100%' })
       }
       .scrollBar(BarState.Off)
       .layoutWeight(1)

@@ -53,6 +53,7 @@ export struct PrivacyPage {
         }
         .width('100%')
         .padding({ bottom: WindowUtils.getBottomSafeVp() + AppSpace.Xl })
+        .constraintSize({ minHeight: '100%' })
       }
       .layoutWeight(1)
       .scrollBar(BarState.Off)

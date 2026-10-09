@@ -67,6 +67,7 @@ export struct CompliancePage {
           left: AppSpace.Md, right: AppSpace.Md,
           bottom: WindowUtils.getBottomSafeVp() + AppSpace.Xl
         })
+        .constraintSize({ minHeight: '100%' })
       }
       .layoutWeight(1)
       .scrollBar(BarState.Off)

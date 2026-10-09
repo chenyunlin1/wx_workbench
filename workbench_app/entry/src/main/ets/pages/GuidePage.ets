@@ -99,6 +99,7 @@ export struct GuidePage {
         }
         .width('100%')
         .padding({ left: AppSpace.Md, right: AppSpace.Md, top: AppSpace.Xs, bottom: AppSpace.Xl })
+        .constraintSize({ minHeight: '100%' })
       }
       .layoutWeight(1)
       .scrollBar(BarState.Off)

@@ -139,6 +139,7 @@ export struct SettingsPage {
             top: this.isCompactLayout() ? 0 : AppSpace.Sm,
             bottom: AppSpace.Xl
           })
+          .constraintSize({ minHeight: '100%' })
         }
         .layoutWeight(1)
         .scrollBar(BarState.Off)
