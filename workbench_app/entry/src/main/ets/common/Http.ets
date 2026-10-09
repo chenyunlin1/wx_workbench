@@ -61,7 +61,7 @@ interface ErrorBody {
 /**
  * 统一 HTTP 客户端：
  * - 自动拼接 baseUrl 与 /api 前缀
- * - 自动携带 Bearer Token，401 时清除会话回登录页
+ * - 自动携带 Bearer Token，已登录时 401 清除会话回登录页
  * - 统一解包 { code, message, data } 响应
  * 说明：鸿蒙 HttpMethod 枚举不含 PATCH，后端已为所有 PATCH 路由补充了 PUT 别名。
  */
@@ -122,7 +122,9 @@ export class Http {
       throw new ApiError(envelope.message.length > 0 ? envelope.message : '请求失败', status)
     }
 
-    if (status === 401) {
+    // 401 仅在携带 token（已登录）时才视为会话过期；登录接口本身返回的 401
+    // （密码错误等）落到下方通用解析，透出服务端真实消息
+    if (status === 401 && Session.token.length > 0) {
       Session.logout(true)
       throw new ApiError('登录已过期，请重新登录', 401)
     }
