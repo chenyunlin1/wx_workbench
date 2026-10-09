@@ -1,6 +1,7 @@
 import { Injectable, UnauthorizedException } from '@nestjs/common'
 import { JwtService } from '@nestjs/jwt'
 import * as bcrypt from 'bcryptjs'
+import { UpdateProfileDto } from '../users/dto/update-profile.dto'
 import { UsersService } from '../users/users.service'
 import type { LoginDto } from './dto/login.dto'
 
@@ -26,5 +27,9 @@ export class AuthService {
     })
 
     return { accessToken, user: safeUser }
+  }
+
+  updateProfile(userId: number, dto: UpdateProfileDto) {
+    return this.usersService.updateProfile(userId, dto)
   }
 }

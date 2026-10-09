@@ -4,6 +4,7 @@ import * as bcrypt from 'bcryptjs'
 import { Repository } from 'typeorm'
 import { User } from '../entities'
 import { CreateUserDto } from './dto/create-user.dto'
+import { UpdateProfileDto } from './dto/update-profile.dto'
 import { UpdateUserDto } from './dto/update-user.dto'
 
 @Injectable()
@@ -66,6 +67,18 @@ export class UsersService {
 
     await this.userRepository.save(user)
     return this.findById(id)
+  }
+
+  /** 本人修改资料：昵称 / 头像（空值即清除） */
+  async updateProfile(id: number, dto: UpdateProfileDto) {
+    const user = await this.userRepository.findOne({ where: { id } })
+    if (!user) throw new NotFoundException('用户不存在')
+
+    if (dto.nickname !== undefined) user.nickname = dto.nickname.trim() || null
+    if (dto.avatar !== undefined) user.avatar = dto.avatar.trim() || null
+
+    const saved = await this.userRepository.save(user)
+    return this.removePassword(saved)
   }
 
   async remove(id: number) {

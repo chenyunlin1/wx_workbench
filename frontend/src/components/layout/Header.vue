@@ -1,9 +1,10 @@
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ArrowDown, ChatDotRound, Menu as MenuIcon, Moon, Sunny } from '@element-plus/icons-vue'
 import { useThemeStore } from '@/stores/theme'
 import { useUserStore } from '@/stores/user'
+import ProfileDialog from './ProfileDialog.vue'
 
 defineProps<{
   mobile?: boolean
@@ -25,6 +26,8 @@ const themeValue = computed({
 })
 
 const askAi = () => router.push('/ai')
+
+const profileVisible = ref(false)
 
 const logout = () => {
   userStore.logout()
@@ -84,13 +87,16 @@ const logout = () => {
         </button>
         <template #dropdown>
           <el-dropdown-menu>
-            <el-dropdown-item @click="router.push('/users')">个人设置</el-dropdown-item>
+            <el-dropdown-item @click="profileVisible = true">个人资料</el-dropdown-item>
+            <el-dropdown-item @click="router.push('/users')">用户管理</el-dropdown-item>
             <el-dropdown-item divided @click="logout">退出登录</el-dropdown-item>
           </el-dropdown-menu>
         </template>
       </el-dropdown>
     </div>
   </header>
+
+  <ProfileDialog v-model="profileVisible" />
 </template>
 
 <style scoped lang="scss">

@@ -7,6 +7,7 @@ export interface ApiResponse<T> {
 export interface User {
   id: number
   username: string
+  nickname?: string | null
   avatar?: string | null
   role: 'admin' | 'user'
   createdAt?: string

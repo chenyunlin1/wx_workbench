@@ -1,5 +1,5 @@
 import { defineStore } from 'pinia'
-import { getProfile, login as loginApi } from '@/api/auth'
+import { getProfile, login as loginApi, updateProfile as updateProfileApi } from '@/api/auth'
 import { getToken, removeToken, setToken } from '@/api'
 import type { User } from '@/types'
 
@@ -22,7 +22,7 @@ export const useUserStore = defineStore('user', {
   getters: {
     isLoggedIn: (state) => Boolean(state.token),
     isAdmin: (state) => state.user?.role === 'admin',
-    displayName: (state) => state.user?.username || '超级管理员',
+    displayName: (state) => state.user?.nickname || state.user?.username || '超级管理员',
   },
   actions: {
     async login(payload: { username: string; password: string }) {
@@ -36,6 +36,11 @@ export const useUserStore = defineStore('user', {
     async fetchProfile() {
       if (!this.token) return null
       this.user = await getProfile()
+      localStorage.setItem(USER_KEY, JSON.stringify(this.user))
+      return this.user
+    },
+    async updateProfile(payload: { nickname?: string; avatar?: string }) {
+      this.user = await updateProfileApi(payload)
       localStorage.setItem(USER_KEY, JSON.stringify(this.user))
       return this.user
     },

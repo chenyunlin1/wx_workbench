@@ -22,6 +22,8 @@ import { ProfileMenuDestination } from '../components/ProfileMenuDestination';
 import { WindowUtils } from '../utils/WindowUtils';
 import { PlatformCompat } from '../utils/PlatformCompat';
 import { Session, SessionStore } from '../store/Session';
+import { Api } from '../api/Api';
+import { User } from '../model/Models';
 
 @Entry
 @ComponentV2
@@ -33,6 +35,14 @@ struct Index {
     // 先 push home 作为栈底，保证栈不空。
     if (this.navStack.size() === 0) {
       this.navStack.pushPathByName('home', null, false);
+    }
+    // 静默刷新用户资料：其他端改过的昵称/头像能在启动时同步过来
+    if (Session.isLoggedIn()) {
+      Api.getProfile().then((user: User) => {
+        Session.updateUser(user);
+      }).catch(() => {
+        // 网络异常时保留本地缓存；401 由 Http 层统一提示过期
+      });
     }
   }
 

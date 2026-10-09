@@ -6,6 +6,7 @@
 export interface User {
   id: number
   username: string
+  nickname?: string | null
   avatar?: string | null
   role: string
   createdAt?: string

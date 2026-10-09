@@ -46,6 +46,11 @@ export interface LoginPayload {
   password: string
 }
 
+export interface UpdateProfilePayload {
+  nickname: string
+  avatar: string
+}
+
 export interface HabitPayload {
   name: string
   icon: string
@@ -165,6 +170,11 @@ export class Api {
 
   static getProfile(): Promise<User> {
     return Http.get<User>('/auth/profile')
+  }
+
+  static updateProfile(nickname: string, avatar: string): Promise<User> {
+    const payload: UpdateProfilePayload = { nickname: nickname, avatar: avatar }
+    return Http.patch<User>('/auth/profile', payload)
   }
 
   /* ---------------- 首页聚合 ---------------- */

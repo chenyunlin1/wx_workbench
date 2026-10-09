@@ -50,6 +50,19 @@ export struct HomeTab {
     this.reload();
   }
 
+  private avatarUrl(): string {
+    if (Session.user === null) {
+      return ''
+    }
+    const avatar = Session.user.avatar
+    return avatar === undefined || avatar === null ? '' : avatar
+  }
+
+  private initial(): string {
+    const name = Session.displayName()
+    return name.length > 0 ? name.substring(0, 1).toUpperCase() : '?'
+  }
+
   @Monitor('session.dataVersion')
   onDataVersionChange(): void {
     this.reload();
@@ -180,22 +193,30 @@ export struct HomeTab {
                 Text(Fmt.today() + ' · ' + Fmt.weekday(Fmt.today()))
                   .fontSize(11)
                   .fontColor($r('sys.color.font_tertiary'))
-                Text(this.greeting() + '，' + Session.username())
+                Text(this.greeting() + '，' + Session.displayName())
                   .fontSize(AppFont.TitleL)
                   .fontWeight(FontWeight.Bold)
                   .fontColor($r('sys.color.font_primary'))
               }
               .alignItems(HorizontalAlign.Start)
               .layoutWeight(1)
-              Text(Session.username().substring(0, 1).toUpperCase())
-                .fontSize(AppFont.Title)
-                .fontWeight(FontWeight.Bold)
-                .fontColor(AppColor.OnBrand)
-                .width(42)
-                .height(42)
-                .textAlign(TextAlign.Center)
-                .borderRadius(21)
-                .backgroundColor(AppColor.Brand)
+              if (this.avatarUrl().length > 0) {
+                Image(this.avatarUrl())
+                  .width(42)
+                  .height(42)
+                  .borderRadius(21)
+                  .objectFit(ImageFit.Cover)
+              } else {
+                Text(this.initial())
+                  .fontSize(AppFont.Title)
+                  .fontWeight(FontWeight.Bold)
+                  .fontColor(AppColor.OnBrand)
+                  .width(42)
+                  .height(42)
+                  .textAlign(TextAlign.Center)
+                  .borderRadius(21)
+                  .backgroundColor(AppColor.Brand)
+              }
             }
             .width('100%')
 

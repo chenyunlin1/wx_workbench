@@ -1,10 +1,16 @@
 import { HdsCompat } from '../utils/HdsCompat';
-import { AppColor, AppFont, AppRadius, AppSpace, HomeTheme } from '../theme/Theme';
+import { AppColor, AppFont, AppMaterial, AppRadius, AppSpace, HomeTheme } from '../theme/Theme';
 import { HdsNavigation, HdsNavigationTitleMode } from '@kit.UIDesignKit';
 import { WindowUtils } from '../utils/WindowUtils';
 import { Session, SessionStore } from '../store/Session';
 import { Api } from '../api/Api';
 import { Fmt, toast } from '../common/AppKit';
+import { User } from '../model/Models';
+import { SHEET_PAD_BOTTOM, SHEET_PAD_TOP, SheetHeader, SheetSubmit } from '../components/Ui';
+import { photoAccessHelper } from '@kit.MediaLibraryKit';
+import { fileIo } from '@kit.CoreFileKit';
+import { image } from '@kit.ImageKit';
+import { util } from '@kit.ArkTS';
 
 class ProfileItem {
   icon: Resource;
@@ -35,6 +41,35 @@ const SUPPORT_ITEMS: ProfileItem[] = [
 const ROW_INDENT: number = AppSpace.Md;
 const MINI_TITLE_BAR_HEIGHT: number = 56;
 const ICON_SIZE: number = 28;
+const AVATAR_MAX_SIDE: number = 256;
+const AVATAR_MAX_CHARS: number = 60000;
+const AVATAR_SIZE: number = 48;
+
+/** 相册选图 → 等比缩放到 256px 内 → JPEG 压缩 → data URL（与网页端一致） */
+async function compressAvatar(uri: string): Promise<string> {
+  const file = fileIo.openSync(uri, fileIo.OpenMode.READ_ONLY);
+  try {
+    const source = image.createImageSource(file.fd);
+    const info = await source.getImageInfo();
+    const maxSide = Math.max(info.size.width, info.size.height);
+    const scale = maxSide > AVATAR_MAX_SIDE ? AVATAR_MAX_SIDE / maxSide : 1;
+    const pixelMap = await source.createPixelMap({
+      desiredSize: {
+        width: Math.max(1, Math.round(info.size.width * scale)),
+        height: Math.max(1, Math.round(info.size.height * scale))
+      }
+    });
+    const packer = image.createImagePacker();
+    const buffer = await packer.packToData(pixelMap, { format: 'image/jpeg', quality: 82 });
+    packer.release();
+    pixelMap.release();
+    source.release();
+    const base64 = new util.Base64Helper();
+    return 'data:image/jpeg;base64,' + base64.encodeToStringSync(new Uint8Array(buffer));
+  } finally {
+    fileIo.closeSync(file);
+  }
+}
 
 @ComponentV2
 export struct ProfilePage {
@@ -44,6 +79,11 @@ export struct ProfilePage {
   @Local showServer: boolean = false;
   @Local serverInput: string = Session.serverUrl;
   @Local testing: boolean = false;
+  @Local showEdit: boolean = false;
+  @Local editNickname: string = '';
+  @Local editAvatar: string = '';
+  @Local saving: boolean = false;
+  @Local picking: boolean = false;
 
   private scrollScroller: Scroller = new Scroller();
 
@@ -91,6 +131,78 @@ export struct ProfilePage {
   private logout(): void {
     Session.logout(false);
     toast('已退出登录');
+  }
+
+  private avatarUrl(): string {
+    if (Session.user === null) {
+      return '';
+    }
+    const avatar = Session.user.avatar;
+    return avatar === undefined || avatar === null ? '' : avatar;
+  }
+
+  private initial(): string {
+    const name = Session.displayName();
+    return name.length > 0 ? name.substring(0, 1).toUpperCase() : '?';
+  }
+
+  private openEdit(): void {
+    if (Session.user === null) {
+      return;
+    }
+    const nickname = Session.user.nickname;
+    this.editNickname = nickname === undefined || nickname === null ? '' : nickname;
+    this.editAvatar = this.avatarUrl();
+    this.showEdit = true;
+  }
+
+  private pickAvatar(): void {
+    if (this.picking) {
+      return;
+    }
+    const options = new photoAccessHelper.PhotoSelectOptions();
+    options.MIMEType = photoAccessHelper.PhotoViewMIMETypes.IMAGE_TYPE;
+    options.maxSelectNumber = 1;
+    const picker = new photoAccessHelper.PhotoViewPicker();
+    this.picking = true;
+    picker.select(options).then((result: photoAccessHelper.PhotoSelectResult) => {
+      if (result.photoUris.length === 0) {
+        return;
+      }
+      return compressAvatar(result.photoUris[0]).then((dataUrl: string) => {
+        if (dataUrl.length > AVATAR_MAX_CHARS) {
+          toast('图片处理后仍过大，请换一张');
+          return;
+        }
+        this.editAvatar = dataUrl;
+      });
+    }).catch(() => {
+      // 用户取消选择或图片处理失败，保持当前头像不变
+    }).finally(() => {
+      this.picking = false;
+    });
+  }
+
+  private saveProfile(): void {
+    if (Session.user === null || this.saving) {
+      return;
+    }
+    const nickname = this.editNickname.trim();
+    if (nickname.length > 64) {
+      toast('昵称不能超过 64 个字符');
+      return;
+    }
+    this.saving = true;
+    Api.updateProfile(nickname, this.editAvatar).then((user: User) => {
+      Session.updateUser(user);
+      this.showEdit = false;
+      toast('个人资料已更新');
+    }).catch((err: Object) => {
+      const msg = err instanceof Error ? err.message : '保存失败';
+      toast('❌ ' + msg);
+    }).finally(() => {
+      this.saving = false;
+    });
   }
 
   private visibleItems(items: ProfileItem[]): ProfileItem[] {
@@ -182,22 +294,145 @@ export struct ProfilePage {
     .width('100%')
     .height('100%')
     .expandSafeArea([SafeAreaType.SYSTEM], [SafeAreaEdge.TOP, SafeAreaEdge.BOTTOM])
+    .bindSheet($$this.showEdit, this.editSheet(), {
+      height: 520,
+      dragBar: true,
+      preferType: SheetType.BOTTOM,
+      backgroundColor: AppMaterial.SheetBackground,
+      blurStyle: AppMaterial.SheetBlur,
+      systemMaterial: AppMaterial.Sheet
+    })
+  }
+
+  @Builder
+  editSheet() {
+    Scroll() {
+      Column() {
+        SheetHeader({ title: '编辑个人资料' })
+
+        Row({ space: AppSpace.Md }) {
+          if (this.editAvatar.length > 0) {
+            Image(this.editAvatar)
+              .width(64)
+              .height(64)
+              .borderRadius(32)
+              .objectFit(ImageFit.Cover)
+          } else {
+            Text(this.initial())
+              .fontSize(AppFont.TitleL)
+              .fontWeight(FontWeight.Bold)
+              .fontColor(AppColor.OnBrand)
+              .width(64)
+              .height(64)
+              .textAlign(TextAlign.Center)
+              .borderRadius(32)
+              .backgroundColor(AppColor.Brand)
+          }
+
+          Column({ space: AppSpace.Xs }) {
+            Text(this.picking ? '处理中…' : '选择图片')
+              .fontSize(AppFont.Body)
+              .fontWeight(FontWeight.Medium)
+              .fontColor(AppColor.Brand)
+              .textAlign(TextAlign.Center)
+              .width('100%')
+              .height(38)
+              .borderRadius(AppRadius.Pill)
+              .backgroundColor($r('sys.color.comp_background_tertiary'))
+              .onClick(() => {
+                this.pickAvatar();
+              })
+            if (this.editAvatar.length > 0) {
+              Text('移除头像')
+                .fontSize(AppFont.Caption)
+                .fontColor(AppColor.Danger)
+                .textAlign(TextAlign.Center)
+                .width('100%')
+                .height(32)
+                .borderRadius(AppRadius.Pill)
+                .backgroundColor($r('sys.color.comp_background_tertiary'))
+                .onClick(() => {
+                  this.editAvatar = '';
+                })
+            }
+          }
+          .layoutWeight(1)
+        }
+        .width('100%')
+        .alignItems(VerticalAlign.Center)
+        .margin({ top: AppSpace.Md })
+
+        Text('从相册选择，自动压缩至 256px 内保存')
+          .fontSize(10)
+          .fontColor($r('sys.color.font_tertiary'))
+          .width('100%')
+          .margin({ top: AppSpace.Xs })
+
+        Text('昵称')
+          .fontSize(AppFont.Caption)
+          .fontColor($r('sys.color.font_secondary'))
+          .margin({ top: 14, bottom: 6 })
+        TextInput({ placeholder: '留空则显示用户名', text: this.editNickname })
+          .placeholderColor($r('sys.color.font_tertiary'))
+          .fontColor($r('sys.color.font_primary'))
+          .fontSize(AppFont.Body)
+          .backgroundColor($r('sys.color.comp_background_tertiary'))
+          .borderRadius(AppRadius.Md)
+          .height(42)
+          .maxLength(64)
+          .align(Alignment.Start)
+          .onChange((value: string) => {
+            this.editNickname = value;
+          })
+
+        Text('登录用户名：' + Session.username())
+          .fontSize(AppFont.Caption)
+          .fontColor($r('sys.color.font_tertiary'))
+          .width('100%')
+          .margin({ top: AppSpace.Sm })
+
+        SheetSubmit({
+          label: this.saving ? '保存中…' : '保 存',
+          busy: this.saving,
+          onSubmit: (): void => {
+            this.saveProfile();
+          }
+        })
+      }
+      .padding({
+        left: AppSpace.Md,
+        right: AppSpace.Md,
+        top: SHEET_PAD_TOP,
+        bottom: SHEET_PAD_BOTTOM
+      })
+      .constraintSize({ minHeight: '100%' })
+    }
+    .scrollBar(BarState.Off)
+    .height('100%')
   }
 
   @Builder
   buildUserCard() {
     Row({ space: AppSpace.Sm }) {
-      Text(Session.username().length > 0 ? Session.username().substring(0, 1).toUpperCase() : '?')
-        .fontSize(AppFont.TitleL)
-        .fontWeight(FontWeight.Bold)
-        .fontColor(AppColor.OnBrand)
-        .width(48)
-        .height(48)
-        .textAlign(TextAlign.Center)
-        .borderRadius(24)
-        .backgroundColor(AppColor.Brand)
+      if (this.avatarUrl().length > 0) {
+        Image(this.avatarUrl())
+          .width(AVATAR_SIZE)
+          .height(AVATAR_SIZE)
+          .borderRadius(AVATAR_SIZE / 2)
+          .objectFit(ImageFit.Cover)
+      } else {
+        Text(this.initial())
+          .fontSize(AppFont.TitleL)
+          .fontWeight(FontWeight.Bold)
+          .fontColor(AppColor.OnBrand)
+          .width(AVATAR_SIZE)
+          .height(AVATAR_SIZE)
+          .textAlign(TextAlign.Center)
+          .borderRadius(AVATAR_SIZE / 2)
+          .backgroundColor(AppColor.Brand)
+      }
       Column({ space: AppSpace.Xxs }) {
-        Text(Session.username())
+        Text(Session.displayName())
           .fontSize(AppFont.Title)
           .fontWeight(FontWeight.Bold)
           .fontColor($r('sys.color.font_primary'))
@@ -220,11 +455,18 @@ export struct ProfilePage {
       }
       .alignItems(HorizontalAlign.Start)
       .layoutWeight(1)
+
+      SymbolGlyph($r('sys.symbol.chevron_right'))
+        .fontSize(24)
+        .width(24)
+        .height(24)
+        .fontColor([$r('sys.color.font_tertiary')])
     }
     .width('100%')
     .padding(ROW_INDENT)
     .backgroundColor($r('sys.color.comp_background_primary'))
     .borderRadius(AppRadius.Lg)
+    .onClick(() => this.openEdit())
   }
 
   @Builder

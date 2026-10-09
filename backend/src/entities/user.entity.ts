@@ -23,10 +23,14 @@ export class User {
   @Column({ unique: true, length: 64 })
   username: string
 
+  @Column({ type: 'varchar', nullable: true, length: 64 })
+  nickname: string | null
+
   @Column({ select: false })
   password: string
 
-  @Column({ type: 'varchar', nullable: true, length: 500 })
+  /** 支持 http(s) 图片地址或 data:image/...;base64 数据 URL（客户端压缩到 256px 内） */
+  @Column({ type: 'mediumtext', nullable: true })
   avatar: string | null
 
   @Column({ type: 'enum', enum: UserRole, default: UserRole.USER })

@@ -44,6 +44,24 @@ export class SessionStore {
     return this.user === null ? '' : this.user.username
   }
 
+  /** 显示名：昵称优先，未设置时回退用户名 */
+  displayName(): string {
+    if (this.user === null) {
+      return ''
+    }
+    const nickname = this.user.nickname
+    if (nickname !== undefined && nickname !== null && nickname.length > 0) {
+      return nickname
+    }
+    return this.user.username
+  }
+
+  /** 资料修改成功后刷新本地用户缓存 */
+  updateUser(user: User): void {
+    this.user = user
+    this.writeString(KEY_USER, JSON.stringify(user))
+  }
+
   isAdmin(): boolean {
     return this.user !== null && this.user.role === 'admin'
   }

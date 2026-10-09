@@ -13,3 +13,10 @@ export const getProfile = () =>
     url: '/auth/profile',
     method: 'GET',
   })
+
+export const updateProfile = (payload: { nickname?: string; avatar?: string }) =>
+  request<User>({
+    url: '/auth/profile',
+    method: 'PATCH',
+    data: payload,
+  })

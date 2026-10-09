@@ -76,7 +76,7 @@ const footerItems = [
       </el-avatar>
       <div class="user-copy">
         <strong>{{ userStore.displayName }}</strong>
-        <span><i /> 超级管理员</span>
+        <span><i /> {{ userStore.user?.role === 'admin' ? '管理员' : '用户' }}</span>
       </div>
       <el-icon class="user-more"><MoreFilled /></el-icon>
     </div>
