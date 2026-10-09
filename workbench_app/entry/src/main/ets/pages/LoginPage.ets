@@ -1,21 +1,21 @@
 import { promptAction } from '@kit.ArkUI'
 import { Api } from '../api/Api'
 import { toast } from '../common/AppKit'
-import { Theme } from '../common/Theme'
 import { Session } from '../store/Session'
+import { AppColor, AppFont, AppRadius, AppSpace } from '../theme/Theme'
+import { WindowUtils } from '../utils/WindowUtils'
 import { TechBackground } from '../components/Ui'
 
-@Component
+/** 应用入口：登录成功后由 Session.token 驱动 Index 切换到主页面。 */
+@ComponentV2
 export struct LoginPage {
-  @Consume('topInset') topInset: number
-  @Consume('bottomInset') bottomInset: number
-  @State username: string = 'admin'
-  @State password: string = ''
-  @State serverUrl: string = Session.serverUrl
-  @State loading: boolean = false
-  @State showServer: boolean = false
+  @Local username: string = 'admin'
+  @Local password: string = ''
+  @Local serverUrl: string = Session.serverUrl
+  @Local loading: boolean = false
+  @Local showServer: boolean = false
 
-  async doLogin(): Promise<void> {
+  private async doLogin(): Promise<void> {
     if (this.username.length === 0 || this.password.length === 0) {
       toast('请输入账号和密码')
       return
@@ -33,7 +33,7 @@ export struct LoginPage {
     }
   }
 
-  saveServer(): void {
+  private saveServer(): void {
     const url = this.serverUrl.trim()
     if (url.length === 0) {
       toast('服务器地址不能为空')
@@ -47,37 +47,20 @@ export struct LoginPage {
     Stack() {
       TechBackground()
 
-      // 装饰光晕
-      Column()
-        .width(260)
-        .height(260)
-        .borderRadius(130)
-        .backgroundColor('#263B82F6')
-        .blur(60)
-        .position({ x: -60, y: 80 })
-      Column()
-        .width(220)
-        .height(220)
-        .borderRadius(110)
-        .backgroundColor('#2634E1B5')
-        .blur(60)
-        .position({ x: 240, y: 480 })
-
       Column({ space: 0 }) {
         // Logo 与标题
-        Column({ space: 10 }) {
-          Text('◈')
+        Column({ space: AppSpace.Xs }) {
+          SymbolGlyph($r('sys.symbol.square_grid_2x2'))
             .fontSize(44)
-            .fontColor(Theme.CYAN)
-            .shadow({ radius: 20, color: '#8822D3EE' })
-          Text('LifeOS 工作台')
+            .fontColor([AppColor.Brand])
+          Text($r('app.string.app_brand_name'))
             .fontSize(26)
             .fontWeight(FontWeight.Bold)
-            .fontColor(Theme.TEXT)
+            .fontColor($r('sys.color.font_primary'))
             .letterSpacing(2)
           Text('LIFE · WORK · DATA · SYNC')
             .fontSize(11)
-            .fontColor(Theme.TEXT_FAINT)
+            .fontColor($r('sys.color.font_tertiary'))
             .letterSpacing(4)
         }
         .margin({ bottom: 36 })
@@ -85,34 +68,32 @@ export struct LoginPage {
         // 登录卡片
         Column() {
           Text('账号登录')
-            .fontSize(16)
+            .fontSize(AppFont.BodyL)
             .fontWeight(FontWeight.Bold)
-            .fontColor(Theme.TEXT)
-            .margin({ bottom: 16 })
+            .fontColor($r('sys.color.font_primary'))
+            .margin({ bottom: AppSpace.Md })
 
           TextInput({ placeholder: '用户名', text: this.username })
-            .placeholderColor(Theme.TEXT_FAINT)
-            .fontColor(Theme.TEXT)
-            .backgroundColor(Theme.INPUT_BG)
-            .borderRadius(12)
-            .border({ width: 1, color: Theme.BORDER })
+            .placeholderColor($r('sys.color.font_tertiary'))
+            .fontColor($r('sys.color.font_primary'))
+            .backgroundColor($r('sys.color.comp_background_tertiary'))
+            .borderRadius(AppRadius.Md)
             .height(46)
             .align(Alignment.Start)
-            .margin({ bottom: 12 })
+            .margin({ bottom: AppSpace.Sm })
             .onChange((value: string) => {
               this.username = value
             })
 
           TextInput({ placeholder: '密码', text: this.password })
-            .placeholderColor(Theme.TEXT_FAINT)
-            .fontColor(Theme.TEXT)
-            .backgroundColor(Theme.INPUT_BG)
-            .borderRadius(12)
-            .border({ width: 1, color: Theme.BORDER })
+            .placeholderColor($r('sys.color.font_tertiary'))
+            .fontColor($r('sys.color.font_primary'))
+            .backgroundColor($r('sys.color.comp_background_tertiary'))
+            .borderRadius(AppRadius.Md)
             .height(46)
             .align(Alignment.Start)
             .type(InputType.Password)
-            .margin({ bottom: 8 })
+            .margin({ bottom: AppSpace.Xs })
             .onChange((value: string) => {
               this.password = value
             })
@@ -123,29 +104,28 @@ export struct LoginPage {
           Row() {
             Text('服务器：' + this.serverUrl)
               .fontSize(11)
-              .fontColor(Theme.TEXT_FAINT)
+              .fontColor($r('sys.color.font_tertiary'))
               .maxLines(1)
               .textOverflow({ overflow: TextOverflow.Ellipsis })
               .layoutWeight(1)
             Text('修改')
               .fontSize(11)
-              .fontColor(Theme.CYAN)
+              .fontColor(AppColor.Brand)
               .onClick(() => {
                 this.showServer = !this.showServer
               })
           }
           .width('100%')
-          .margin({ top: 6, bottom: 4 })
+          .margin({ top: 6, bottom: AppSpace.Xxs })
 
           if (this.showServer) {
-            Row({ space: 8 }) {
+            Row({ space: AppSpace.Xs }) {
               TextInput({ text: this.serverUrl })
-                .placeholderColor(Theme.TEXT_FAINT)
-                .fontColor(Theme.TEXT)
-                .fontSize(12)
-                .backgroundColor(Theme.INPUT_BG)
-                .borderRadius(10)
-                .border({ width: 1, color: Theme.BORDER })
+                .placeholderColor($r('sys.color.font_tertiary'))
+                .fontColor($r('sys.color.font_primary'))
+                .fontSize(AppFont.Caption)
+                .backgroundColor($r('sys.color.comp_background_tertiary'))
+                .borderRadius(AppRadius.Sm)
                 .height(38)
                 .align(Alignment.Start)
                 .layoutWeight(1)
@@ -153,36 +133,37 @@ export struct LoginPage {
                   this.serverUrl = value
                 })
               Text('保存')
-                .fontSize(12)
-                .fontColor('#FFFFFF')
-                .padding({ left: 12, right: 12, top: 8, bottom: 8 })
-                .borderRadius(10)
-                .backgroundColor(Theme.PRIMARY)
+                .fontSize(AppFont.Caption)
+                .fontWeight(FontWeight.Medium)
+                .fontColor(AppColor.OnBrand)
+                .padding({ left: AppSpace.Sm, right: AppSpace.Sm, top: AppSpace.Xs, bottom: AppSpace.Xs })
+                .borderRadius(AppRadius.Pill)
+                .backgroundColor(AppColor.Brand)
                 .onClick(() => {
                   this.saveServer()
                 })
             }
             .width('100%')
-            .margin({ bottom: 4 })
+            .margin({ bottom: AppSpace.Xxs })
 
             Text('模拟器用 http://10.0.2.2:3000，真机请填电脑局域网 IP')
               .fontSize(10)
-              .fontColor(Theme.TEXT_FAINT)
-              .margin({ bottom: 4 })
+              .fontColor($r('sys.color.font_tertiary'))
+              .margin({ bottom: AppSpace.Xxs })
           }
 
           // 登录按钮
           Text(this.loading ? '登录中…' : '进 入 工 作 台')
-            .fontSize(15)
-            .fontWeight(FontWeight.Bold)
-            .fontColor('#FFFFFF')
+            .fontSize(AppFont.BodyL)
+            .fontWeight(FontWeight.Medium)
+            .fontColor(AppColor.OnBrand)
             .textAlign(TextAlign.Center)
             .width('100%')
             .height(46)
-            .borderRadius(12)
-            .linearGradient({ angle: 135, colors: Theme.BRAND_COLORS })
-            .shadow({ radius: 14, color: '#553B82F6', offsetY: 4 })
-            .margin({ top: 12 })
+            .borderRadius(AppRadius.Pill)
+            .backgroundColor(AppColor.Brand)
+            .opacity(this.loading ? 0.6 : 1)
+            .margin({ top: AppSpace.Sm })
             .onClick(() => {
               if (!this.loading) {
                 this.doLogin()
@@ -191,21 +172,24 @@ export struct LoginPage {
 
           Text('演示账号 admin / admin123')
             .fontSize(11)
-            .fontColor(Theme.TEXT_FAINT)
-            .margin({ top: 14 })
+            .fontColor($r('sys.color.font_tertiary'))
+            .margin({ top: AppSpace.Sm })
         }
         .width('100%')
-        .padding(20)
-        .borderRadius(20)
-        .linearGradient({ angle: 180, colors: Theme.CARD_COLORS })
-        .border({ width: 1, color: Theme.BORDER })
-        .shadow({ radius: 30, color: '#55000000', offsetY: 10 })
+        .padding(AppSpace.Lg)
+        .borderRadius(AppRadius.Xl)
+        .backgroundColor($r('sys.color.comp_background_primary'))
       }
-      .padding({ left: 28, right: 28, top: this.topInset, bottom: this.bottomInset })
-      .justifyContent(FlexAlign.Center)
+      .padding({
+        left: 28,
+        right: 28,
+        top: WindowUtils.getStatusBarHeightVp(),
+        bottom: WindowUtils.getBottomSafeVp()
+      })
       .justifyContent(FlexAlign.Center)
     }
     .width('100%')
     .height('100%')
+    .backgroundColor($r('sys.color.background_primary'))
   }
 }

@@ -1,78 +1,156 @@
-import { Theme } from '../common/Theme'
-import { LoginPage } from './LoginPage'
-import { MainPage } from './MainPage'
+import { common } from '@kit.AbilityKit';
+import { MainPage } from './MainPage';
+import { LoginPage } from './LoginPage';
+import { SettingsPage } from './SettingsPage';
+import { AppIconPage } from './AppIconPage';
+import { AboutPage } from './AboutPage';
+import { GuidePage } from './GuidePage';
+import { PrivacyPage } from './PrivacyPage';
+import { CompliancePage } from './CompliancePage';
+import { OpenSourcePage } from './OpenSourcePage';
+import { SchedulesPage } from './feature/SchedulesPage';
+import { HabitsPage } from './feature/HabitsPage';
+import { WorkoutPage } from './feature/WorkoutPage';
+import { FinancePage } from './feature/FinancePage';
+import { CollectionPage } from './feature/CollectionPage';
+import { InterviewsPage } from './feature/InterviewsPage';
+import { PracticePage } from './feature/PracticePage';
+import { ShoppingPage } from './feature/ShoppingPage';
+import { UsersPage } from './feature/UsersPage';
+import { KnowledgeDetailPage } from './feature/KnowledgeDetailPage';
+import { ProfileMenuDestination } from '../components/ProfileMenuDestination';
+import { WindowUtils } from '../utils/WindowUtils';
+import { PlatformCompat } from '../utils/PlatformCompat';
+import { Session, SessionStore } from '../store/Session';
 
-/**
- * 应用入口：根据登录状态切换登录页 / 主页面。
- * Session.init 在 EntryAbility.onCreate 中完成。
- * 根容器不做任何避让 padding（保持状态栏透明、内容可滚动到其下），
- * 各页面通过 @Consume 的 topInset / bottomInset 自行预留空间。
- */
 @Entry
-@Component
+@ComponentV2
 struct Index {
-  @StorageLink('hasToken') hasToken: boolean = false
-  @StorageLink('statusBarHeight') @Watch('applyInsets') statusBarHeight: number = 0
-  @StorageLink('navBarHeight') @Watch('applyInsets') navBarHeight: number = 0
-  @StorageLink('colorMode') @Watch('onModeChange') colorMode: string = 'dark'
-  @Provide('topInset') topInset: number = 0
-  @Provide('bottomInset') bottomInset: number = 0
-  @State ready: boolean = false
+  @Local navStack: NavPathStack = new NavPathStack();
+  @Local session: SessionStore = Session;
 
   aboutToAppear(): void {
-    this.applyInsets()
-    setTimeout(() => {
-      this.ready = true
-    }, 500)
+    // 先 push home 作为栈底，保证栈不空。
+    if (this.navStack.size() === 0) {
+      this.navStack.pushPathByName('home', null, false);
+    }
   }
 
-  applyInsets(): void {
-    this.topInset = this.statusBarHeight
-    this.bottomInset = this.navBarHeight
-  }
-
-  /** 系统深浅色切换：重建整棵组件树，让所有页面按新主题取色 */
-  onModeChange(): void {
-    this.ready = false
-    setTimeout(() => {
-      this.ready = true
-    }, 50)
+  /** 登录/退出后重置路由栈，避免旧会话页面残留在新会话里。 */
+  @Monitor('session.token')
+  onLoginStateChange(): void {
+    this.navStack.clear();
+    this.navStack.pushPathByName('home', null, false);
   }
 
   @Builder
-  splash() {
-    Column({ space: 14 }) {
-      Text('◈')
-        .fontSize(52)
-        .fontColor(Theme.CYAN)
-        .shadow({ radius: 24, color: '#8822D3EE' })
-      Text('LifeOS 工作台')
-        .fontSize(20)
-        .fontWeight(FontWeight.Bold)
-        .fontColor(Theme.TEXT)
-        .letterSpacing(3)
-      Text('LOADING…')
-        .fontSize(10)
-        .fontColor(Theme.TEXT_FAINT)
-        .letterSpacing(4)
+  routerMap(name: string, _param: object) {
+    if (name === 'home') {
+      NavDestination() {
+        MainPage({ navStack: this.navStack })
+      }
+      .hideTitleBar(true)
+      .backgroundColor($r('sys.color.background_primary'))
+      .systemTransition(NavigationSystemTransitionType.NONE)
+      .onBackPressed((): boolean => {
+        if (PlatformCompat.desktopWindow) {
+          WindowUtils.minimize();
+          return true;
+        }
+        // 根页返回：移到后台而不是 pop，保证退出应用。
+        try {
+          const ctx = this.getUIContext().getHostContext() as common.UIAbilityContext;
+          ctx.moveAbilityToBackground();
+          return true;
+        } catch (e) {
+          console.error(`[Index] moveAbilityToBackground error: ${e}`);
+          return false;
+        }
+      })
+    } else if (name === 'settings') {
+      ProfileMenuDestination() {
+        SettingsPage({ navStack: this.navStack })
+      }
+    } else if (name === 'appIcon') {
+      ProfileMenuDestination() {
+        AppIconPage({ navStack: this.navStack })
+      }
+    } else if (name === 'about') {
+      ProfileMenuDestination() {
+        AboutPage({ navStack: this.navStack })
+      }
+    } else if (name === 'guide') {
+      ProfileMenuDestination() {
+        GuidePage({ navStack: this.navStack })
+      }
+    } else if (name === 'privacy') {
+      ProfileMenuDestination() {
+        PrivacyPage({ navStack: this.navStack })
+      }
+    } else if (name === 'compliance') {
+      ProfileMenuDestination() {
+        CompliancePage({ navStack: this.navStack })
+      }
+    } else if (name === 'openSource') {
+      ProfileMenuDestination() {
+        OpenSourcePage({ navStack: this.navStack })
+      }
+    } else if (name === 'schedules') {
+      ProfileMenuDestination() {
+        SchedulesPage({ nav: this.navStack })
+      }
+    } else if (name === 'habits') {
+      ProfileMenuDestination() {
+        HabitsPage({ nav: this.navStack })
+      }
+    } else if (name === 'workout') {
+      ProfileMenuDestination() {
+        WorkoutPage({ nav: this.navStack })
+      }
+    } else if (name === 'finance') {
+      ProfileMenuDestination() {
+        FinancePage({ nav: this.navStack })
+      }
+    } else if (name === 'collection') {
+      ProfileMenuDestination() {
+        CollectionPage({ nav: this.navStack })
+      }
+    } else if (name === 'interviews') {
+      ProfileMenuDestination() {
+        InterviewsPage({ nav: this.navStack })
+      }
+    } else if (name === 'practice') {
+      ProfileMenuDestination() {
+        PracticePage({ nav: this.navStack })
+      }
+    } else if (name === 'shopping') {
+      ProfileMenuDestination() {
+        ShoppingPage({ nav: this.navStack })
+      }
+    } else if (name === 'users') {
+      ProfileMenuDestination() {
+        UsersPage({ nav: this.navStack })
+      }
+    } else if (name === 'knowledgeDetail') {
+      ProfileMenuDestination() {
+        KnowledgeDetailPage({ nav: this.navStack })
+      }
     }
-    .width('100%')
-    .height('100%')
-    .justifyContent(FlexAlign.Center)
   }
 
   build() {
-    Stack() {
-      if (!this.ready) {
-        this.splash()
-      } else if (this.hasToken) {
-        MainPage()
-      } else {
-        LoginPage()
+    if (this.session.token.length === 0) {
+      LoginPage()
+    } else {
+      Navigation(this.navStack) {
+        // home 已在 aboutToAppear 中 push，根内容留空
       }
+      .backgroundColor($r('sys.color.background_primary'))
+      .navDestination(this.routerMap)
+      .hideTitleBar(true)
+      .mode(NavigationMode.Stack)
+      .width('100%')
+      .height('100%')
     }
-    .width('100%')
-    .height('100%')
-    .backgroundColor(Theme.BG)
   }
 }

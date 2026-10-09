@@ -1,9 +1,10 @@
-import { Fmt, Options, toast } from '../../common/AppKit'
-import { Api, CollectionUpdate } from '../../api/Api'
+import { Options, toast } from '../../common/AppKit'
+import { Api } from '../../api/Api'
 import { Theme } from '../../common/Theme'
+import { AppColor, AppFont, AppMaterial, AppRadius } from '../../theme/Theme'
 import { Session } from '../../store/Session'
 import { CollectionItem, CollectionListResult, CollectionPayload, CollectionStats } from '../../model/Models'
-import { EmptyView, OptionChips, PAGE_PAD_H, PAGE_SCROLL_BOTTOM, PageHeader, SectionTitle, SheetDelete, SHEET_PAD_BOTTOM, SHEET_PAD_TOP, SheetHeader, SheetSubmit, StarPicker, Stars, TechCard } from '../../components/Ui'
+import { EmptyView, OptionChips, PAGE_PAD_H, PAGE_SCROLL_BOTTOM, PageHeader, SheetDelete, SHEET_PAD_BOTTOM, SHEET_PAD_TOP, SheetHeader, SheetSubmit, StarPicker, Stars, TechCard } from '../../components/Ui'
 
 const TYPE_LABELS: string[] = ['全部', '书籍', '影视', '音乐']
 const TYPE_KEYS: string[] = ['', 'book', 'movie', 'music']
@@ -18,35 +19,35 @@ function typeEmoji(type: string): string {
   return '🎵'
 }
 
-@Component
+@ComponentV2
 export struct CollectionPage {
-  @Consume('nav') nav: NavPathStack
-  @State items: CollectionItem[] = []
-  @State total: number = 0
-  @State stats: CollectionStats | null = null
-  @State typeIndex: number = 0
-  @State statusFilter: string = ''
-  @State keyword: string = ''
-  @State sortIndex: number = 0
-  @State refreshing: boolean = false
-  @State loading: boolean = true
-  @State showForm: boolean = false
-  @State formId: number = 0
-  @State formTypeIndex: number = 1
-  @State formTitle: string = ''
-  @State formStatus: string = 'wish'
-  @State formRating: number = 0
-  @State formYear: string = ''
-  @State formCover: string = ''
-  @State formComment: string = ''
-  @State saving: boolean = false
+  @Param nav: NavPathStack = new NavPathStack();
+  @Local items: CollectionItem[] = [];
+  @Local total: number = 0;
+  @Local stats: CollectionStats | null = null;
+  @Local typeIndex: number = 0;
+  @Local statusFilter: string = '';
+  @Local keyword: string = '';
+  @Local sortIndex: number = 0;
+  @Local refreshing: boolean = false;
+  @Local loading: boolean = true;
+  @Local showForm: boolean = false;
+  @Local formId: number = 0;
+  @Local formTypeIndex: number = 1;
+  @Local formTitle: string = '';
+  @Local formStatus: string = 'wish';
+  @Local formRating: number = 0;
+  @Local formYear: string = '';
+  @Local formCover: string = '';
+  @Local formComment: string = '';
+  @Local saving: boolean = false;
 
   aboutToAppear(): void {
     this.reload()
   }
 
-  reload(): void {
-    Api.collectionStats(new Date().getFullYear()).then((data) => {
+  private reload(): void {
+    Api.collectionStats(new Date().getFullYear()).then((data: CollectionStats) => {
       this.stats = data
     }).catch(() => {
     })
@@ -76,24 +77,24 @@ export struct CollectionPage {
     })
   }
 
-  statusLabels(): string[] {
+  private statusLabels(): string[] {
     const type = TYPE_KEYS[this.typeIndex].length === 0 ? 'book' : TYPE_KEYS[this.typeIndex]
     return ['wish', 'doing', 'done'].map((s: string) => Options.collectionStatusLabel(s, type))
   }
 
-  statusKeys(): string[] {
+  private statusKeys(): string[] {
     return ['', 'wish', 'doing', 'done']
   }
 
-  statusIndex(): number {
+  private statusIndex(): number {
     return this.statusKeys().indexOf(this.statusFilter)
   }
 
-  statusLabelOf(item: CollectionItem): string {
+  private statusLabelOf(item: CollectionItem): string {
     return Options.collectionStatusLabel(item.status, item.type)
   }
 
-  cycleStatus(item: CollectionItem): void {
+  private cycleStatus(item: CollectionItem): void {
     const next = item.status === 'wish' ? 'doing' : item.status === 'doing' ? 'done' : 'wish'
     Api.updateCollectionStatus(item.id, next).then(() => {
       this.reload()
@@ -102,7 +103,7 @@ export struct CollectionPage {
     })
   }
 
-  openCreate(): void {
+  private openCreate(): void {
     this.formId = 0
     this.formTypeIndex = this.typeIndex === 0 ? 1 : this.typeIndex
     this.formTitle = ''
@@ -114,7 +115,7 @@ export struct CollectionPage {
     this.showForm = true
   }
 
-  openEdit(item: CollectionItem): void {
+  private openEdit(item: CollectionItem): void {
     this.formId = item.id
     this.formTypeIndex = item.type === 'book' ? 1 : item.type === 'movie' ? 2 : 3
     this.formTitle = item.title
@@ -126,7 +127,7 @@ export struct CollectionPage {
     this.showForm = true
   }
 
-  saveForm(): void {
+  private saveForm(): void {
     if (this.formTitle.trim().length === 0) {
       toast('请输入标题')
       return
@@ -164,7 +165,7 @@ export struct CollectionPage {
     })
   }
 
-  removeCollection(id: number): void {
+  private removeCollection(id: number): void {
     Api.deleteCollection(id).then(() => {
       toast('已删除')
       this.showForm = false
@@ -175,68 +176,72 @@ export struct CollectionPage {
   }
 
   build() {
-    NavDestination() {
     Stack() {
       Refresh({ refreshing: $$this.refreshing }) {
         Scroll() {
           Column() {
-            PageHeader({ title: '书影音收藏', actionLabel: '＋ 添加', onAction: (): void => {
-              this.openCreate()
-            } })
+            PageHeader({
+              navStack: this.nav,
+              title: '书影音收藏',
+              actionLabel: '＋ 添加',
+              onAction: (): void => {
+                this.openCreate()
+              }
+            })
 
             // 年度统计
             Column() {
-            TechCard() {
-              Row() {
-                Column({ space: 4 }) {
-                  Text('今年新增')
-                    .fontSize(10)
-                    .fontColor(Theme.TEXT_SUB)
-                  Text(this.stats === null ? '-' : this.stats.total.toString())
-                    .fontSize(17)
-                    .fontWeight(FontWeight.Bold)
-                    .fontColor(Theme.CYAN)
+              TechCard() {
+                Row() {
+                  Column({ space: 4 }) {
+                    Text('今年新增')
+                      .fontSize(10)
+                      .fontColor($r('sys.color.font_secondary'))
+                    Text(this.stats === null ? '-' : this.stats.total.toString())
+                      .fontSize(17)
+                      .fontWeight(FontWeight.Bold)
+                      .fontColor(AppColor.Brand)
+                  }
+                  .layoutWeight(1)
+                  Column({ space: 4 }) {
+                    Text('完成')
+                      .fontSize(10)
+                      .fontColor($r('sys.color.font_secondary'))
+                    Text(this.stats === null ? '-' : this.stats.finished.toString())
+                      .fontSize(17)
+                      .fontWeight(FontWeight.Bold)
+                      .fontColor(AppColor.Brand)
+                  }
+                  .layoutWeight(1)
+                  Column({ space: 4 }) {
+                    Text('平均评分')
+                      .fontSize(10)
+                      .fontColor($r('sys.color.font_secondary'))
+                    Text(this.stats === null || this.stats.ratingAverage === null || this.stats.ratingAverage === undefined
+                      ? '-' : this.stats.ratingAverage.toFixed(1))
+                      .fontSize(17)
+                      .fontWeight(FontWeight.Bold)
+                      .fontColor(Theme.WARN)
+                  }
+                  .layoutWeight(1)
                 }
-                .layoutWeight(1)
-                Column({ space: 4 }) {
-                  Text('完成')
-                    .fontSize(10)
-                    .fontColor(Theme.TEXT_SUB)
-                  Text(this.stats === null ? '-' : this.stats.finished.toString())
-                    .fontSize(17)
-                    .fontWeight(FontWeight.Bold)
-                    .fontColor(Theme.MINT)
+                .width('100%')
+                Row({ space: 10 }) {
+                  Text(typeEmoji('book') + (this.stats === null ? '-' : this.stats.books.toString()))
+                    .fontSize(11)
+                    .fontColor($r('sys.color.font_secondary'))
+                  Text(typeEmoji('movie') + (this.stats === null ? '-' : this.stats.movies.toString()))
+                    .fontSize(11)
+                    .fontColor($r('sys.color.font_secondary'))
+                  Text(typeEmoji('music') + (this.stats === null ? '-' : this.stats.music.toString()))
+                    .fontSize(11)
+                    .fontColor($r('sys.color.font_secondary'))
                 }
-                .layoutWeight(1)
-                Column({ space: 4 }) {
-                  Text('平均评分')
-                    .fontSize(10)
-                    .fontColor(Theme.TEXT_SUB)
-                  Text(this.stats === null || this.stats.ratingAverage === null || this.stats.ratingAverage === undefined
-                    ? '-' : this.stats.ratingAverage.toFixed(1))
-                    .fontSize(17)
-                    .fontWeight(FontWeight.Bold)
-                    .fontColor(Theme.WARN)
-                }
-                .layoutWeight(1)
+                .width('100%')
+                .margin({ top: 8 })
               }
-              .width('100%')
-              Row({ space: 10 }) {
-                Text(typeEmoji('book') + (this.stats === null ? '-' : this.stats.books.toString()))
-                  .fontSize(11)
-                  .fontColor(Theme.TEXT_SUB)
-                Text(typeEmoji('movie') + (this.stats === null ? '-' : this.stats.movies.toString()))
-                  .fontSize(11)
-                  .fontColor(Theme.TEXT_SUB)
-                Text(typeEmoji('music') + (this.stats === null ? '-' : this.stats.music.toString()))
-                  .fontSize(11)
-                  .fontColor(Theme.TEXT_SUB)
-              }
-              .width('100%')
-              .margin({ top: 8 })
             }
-            }
-              .width('100%')
+            .width('100%')
             .margin({ top: 4 })
 
             // 筛选
@@ -253,11 +258,12 @@ export struct CollectionPage {
               Row({ space: 8 }) {
                 Text('全部状态')
                   .fontSize(11)
-                  .fontColor(this.statusFilter.length === 0 ? '#FFFFFF' : Theme.TEXT_SUB)
+                  .fontColor(this.statusFilter.length === 0 ? AppColor.OnBrand : $r('sys.color.font_secondary'))
                   .padding({ left: 10, right: 10, top: 4, bottom: 4 })
-                  .borderRadius(999)
-                  .backgroundColor(this.statusFilter.length === 0 ? Theme.PRIMARY : Theme.INPUT_BG)
-                  .border({ width: 1, color: this.statusFilter.length === 0 ? Theme.PRIMARY : Theme.BORDER })
+                  .borderRadius(AppRadius.Pill)
+                  .backgroundColor(this.statusFilter.length === 0 ? AppColor.Brand
+                    : $r('sys.color.comp_background_tertiary'))
+                  .border({ width: 1, color: this.statusFilter.length === 0 ? AppColor.Brand : AppColor.Divider })
                   .onClick(() => {
                     this.statusFilter = ''
                     this.reload()
@@ -265,11 +271,12 @@ export struct CollectionPage {
                 ForEach(['wish', 'doing', 'done'], (status: string, index: number) => {
                   Text(this.statusLabels()[index])
                     .fontSize(11)
-                    .fontColor(this.statusFilter === status ? '#FFFFFF' : Theme.TEXT_SUB)
+                    .fontColor(this.statusFilter === status ? AppColor.OnBrand : $r('sys.color.font_secondary'))
                     .padding({ left: 10, right: 10, top: 4, bottom: 4 })
-                    .borderRadius(999)
-                    .backgroundColor(this.statusFilter === status ? Theme.PRIMARY : Theme.INPUT_BG)
-                    .border({ width: 1, color: this.statusFilter === status ? Theme.PRIMARY : Theme.BORDER })
+                    .borderRadius(AppRadius.Pill)
+                    .backgroundColor(this.statusFilter === status ? AppColor.Brand
+                      : $r('sys.color.comp_background_tertiary'))
+                    .border({ width: 1, color: this.statusFilter === status ? AppColor.Brand : AppColor.Divider })
                     .onClick(() => {
                       this.statusFilter = this.statusFilter === status ? '' : status
                       this.reload()
@@ -278,7 +285,7 @@ export struct CollectionPage {
                 Blank()
                 Text('排序')
                   .fontSize(11)
-                  .fontColor(Theme.TEXT_FAINT)
+                  .fontColor($r('sys.color.font_tertiary'))
               }
               .width('100%')
               OptionChips({
@@ -290,12 +297,12 @@ export struct CollectionPage {
                 }
               })
               TextInput({ placeholder: '搜索标题或短评…', text: this.keyword })
-                .placeholderColor(Theme.TEXT_FAINT)
-                .fontColor(Theme.TEXT)
+                .placeholderColor($r('sys.color.font_tertiary'))
+                .fontColor($r('sys.color.font_primary'))
                 .fontSize(13)
-                .backgroundColor(Theme.INPUT_BG)
-                .borderRadius(12)
-                .border({ width: 1, color: Theme.BORDER })
+                .backgroundColor($r('sys.color.comp_background_tertiary'))
+                .borderRadius(AppRadius.Md)
+                .border({ width: 1, color: AppColor.Divider })
                 .height(40)
                 .align(Alignment.Start)
                 .onChange((value: string) => {
@@ -316,7 +323,7 @@ export struct CollectionPage {
               GridRow({ columns: 2, gutter: 10 }) {
                 ForEach(this.items, (item: CollectionItem) => {
                   GridCol({ span: 1 }) {
-                    TechCard({ paddingV: 0, radius: 16 }) {
+                    TechCard({ paddingV: 0, radius: AppRadius.Lg }) {
                       Column({ space: 0 }) {
                         // 封面
                         Stack({ alignContent: Alignment.Center }) {
@@ -324,13 +331,13 @@ export struct CollectionPage {
                             Text(typeEmoji(item.type))
                               .fontSize(30)
                             Text(item.title.substring(0, 1))
-                              .fontSize(22)
+                              .fontSize(AppFont.TitleL)
                               .fontWeight(FontWeight.Bold)
-                              .fontColor(Theme.TEXT)
+                              .fontColor($r('sys.color.font_primary'))
                           }
                           .width('100%')
                           .height(150)
-                          .linearGradient({ angle: 150, colors: Theme.VIOLET_COLORS })
+                          .linearGradient({ angle: 150, colors: [[AppColor.BrandDark, 0.0], [AppColor.Brand, 1.0]] })
                           if (item.coverUrl !== null && item.coverUrl !== undefined && item.coverUrl.length > 0) {
                             Image(item.coverUrl)
                               .width('100%')
@@ -344,7 +351,7 @@ export struct CollectionPage {
                           Text(item.title)
                             .fontSize(13)
                             .fontWeight(FontWeight.Bold)
-                            .fontColor(Theme.TEXT)
+                            .fontColor($r('sys.color.font_primary'))
                             .maxLines(1)
                             .textOverflow({ overflow: TextOverflow.Ellipsis })
                             .width('100%')
@@ -353,23 +360,23 @@ export struct CollectionPage {
                             if (item.year !== null && item.year !== undefined) {
                               Text(item.year.toString())
                                 .fontSize(10)
-                                .fontColor(Theme.TEXT_FAINT)
+                                .fontColor($r('sys.color.font_tertiary'))
                             }
                           }
                           Row({ space: 6 }) {
                             Text(this.statusLabelOf(item))
                               .fontSize(10)
-                              .fontColor(Theme.MINT)
+                              .fontColor(AppColor.Brand)
                               .padding({ left: 8, right: 8, top: 3, bottom: 3 })
-                              .borderRadius(999)
-                              .border({ width: 1, color: Theme.MINT })
+                              .borderRadius(AppRadius.Pill)
+                              .border({ width: 1, color: AppColor.Brand })
                               .onClick(() => {
                                 this.cycleStatus(item)
                               })
                             Blank()
                             Text('✎')
-                              .fontSize(12)
-                              .fontColor(Theme.CYAN)
+                              .fontSize(AppFont.Caption)
+                              .fontColor(AppColor.Brand)
                               .onClick(() => {
                                 this.openEdit(item)
                               })
@@ -403,15 +410,15 @@ export struct CollectionPage {
     }
     .width('100%')
     .height('100%')
-    .backgroundColor(Theme.BG)
+    .backgroundColor($r('sys.color.background_primary'))
     .bindSheet($$this.showForm, this.formBuilder(), {
       height: 660,
       dragBar: true,
-      backgroundColor: Theme.CARD_SOLID
+      preferType: SheetType.BOTTOM,
+      backgroundColor: AppMaterial.SheetBackground,
+      blurStyle: AppMaterial.SheetBlur,
+      systemMaterial: AppMaterial.Sheet
     })
-    }
-    .hideTitleBar(true)
-    .backgroundColor(Theme.BG)
   }
 
   @Builder
@@ -420,7 +427,7 @@ export struct CollectionPage {
       Column() {
         SheetHeader({ title: this.formId === 0 ? '添加收藏' : '编辑收藏' })
 
-        Text('类型').fontSize(12).fontColor(Theme.TEXT_SUB).margin({ top: 14, bottom: 6 })
+        Text('类型').fontSize(AppFont.Caption).fontColor($r('sys.color.font_secondary')).margin({ top: 14, bottom: 6 })
         OptionChips({
           options: ['书籍', '影视', '音乐'],
           selected: this.formTypeIndex - 1,
@@ -429,20 +436,21 @@ export struct CollectionPage {
           }
         })
 
-        Text('标题').fontSize(12).fontColor(Theme.TEXT_SUB).margin({ top: 12, bottom: 6 })
+        Text('标题').fontSize(AppFont.Caption).fontColor($r('sys.color.font_secondary')).margin({ top: 12, bottom: 6 })
         TextInput({ placeholder: '书名 / 片名 / 专辑名', text: this.formTitle })
-          .fontColor(Theme.TEXT)
-          .fontSize(14)
-          .backgroundColor(Theme.INPUT_BG)
-          .borderRadius(10)
-          .border({ width: 1, color: Theme.BORDER })
+          .placeholderColor($r('sys.color.font_tertiary'))
+          .fontColor($r('sys.color.font_primary'))
+          .fontSize(AppFont.Body)
+          .backgroundColor($r('sys.color.comp_background_tertiary'))
+          .borderRadius(AppRadius.Md)
+          .border({ width: 1, color: AppColor.Divider })
           .height(42)
           .align(Alignment.Start)
           .onChange((value: string) => {
             this.formTitle = value
           })
 
-        Text('状态').fontSize(12).fontColor(Theme.TEXT_SUB).margin({ top: 12, bottom: 6 })
+        Text('状态').fontSize(AppFont.Caption).fontColor($r('sys.color.font_secondary')).margin({ top: 12, bottom: 6 })
         OptionChips({
           options: ['想' + Options.collectionStatusLabel('wish', TYPE_KEYS[this.formTypeIndex]).substring(1),
             Options.collectionStatusLabel('doing', TYPE_KEYS[this.formTypeIndex]),
@@ -453,7 +461,7 @@ export struct CollectionPage {
           }
         })
 
-        Text('评分').fontSize(12).fontColor(Theme.TEXT_SUB).margin({ top: 12, bottom: 6 })
+        Text('评分').fontSize(AppFont.Caption).fontColor($r('sys.color.font_secondary')).margin({ top: 12, bottom: 6 })
         StarPicker({
           value: this.formRating,
           onChange: (value: number) => {
@@ -463,13 +471,14 @@ export struct CollectionPage {
 
         Row({ space: 10 }) {
           Column() {
-            Text('年份').fontSize(12).fontColor(Theme.TEXT_SUB).margin({ bottom: 6 })
+            Text('年份').fontSize(AppFont.Caption).fontColor($r('sys.color.font_secondary')).margin({ bottom: 6 })
             TextInput({ placeholder: '2025', text: this.formYear })
-              .fontColor(Theme.TEXT)
-              .fontSize(14)
-              .backgroundColor(Theme.INPUT_BG)
-              .borderRadius(10)
-              .border({ width: 1, color: Theme.BORDER })
+              .placeholderColor($r('sys.color.font_tertiary'))
+              .fontColor($r('sys.color.font_primary'))
+              .fontSize(AppFont.Body)
+              .backgroundColor($r('sys.color.comp_background_tertiary'))
+              .borderRadius(AppRadius.Md)
+              .border({ width: 1, color: AppColor.Divider })
               .height(42)
               .align(Alignment.Start)
               .type(InputType.Number)
@@ -479,13 +488,14 @@ export struct CollectionPage {
           }
           .layoutWeight(1)
           Column() {
-            Text('封面链接（可选）').fontSize(12).fontColor(Theme.TEXT_SUB).margin({ bottom: 6 })
+            Text('封面链接（可选）').fontSize(AppFont.Caption).fontColor($r('sys.color.font_secondary')).margin({ bottom: 6 })
             TextInput({ placeholder: 'https://…', text: this.formCover })
-              .fontColor(Theme.TEXT)
-              .fontSize(12)
-              .backgroundColor(Theme.INPUT_BG)
-              .borderRadius(10)
-              .border({ width: 1, color: Theme.BORDER })
+              .placeholderColor($r('sys.color.font_tertiary'))
+              .fontColor($r('sys.color.font_primary'))
+              .fontSize(AppFont.Caption)
+              .backgroundColor($r('sys.color.comp_background_tertiary'))
+              .borderRadius(AppRadius.Md)
+              .border({ width: 1, color: AppColor.Divider })
               .height(42)
               .align(Alignment.Start)
               .onChange((value: string) => {
@@ -496,13 +506,14 @@ export struct CollectionPage {
         }
         .width('100%')
 
-        Text('短评（可选）').fontSize(12).fontColor(Theme.TEXT_SUB).margin({ top: 12, bottom: 6 })
+        Text('短评（可选）').fontSize(AppFont.Caption).fontColor($r('sys.color.font_secondary')).margin({ top: 12, bottom: 6 })
         TextArea({ placeholder: '一句话感想…', text: this.formComment })
-          .fontColor(Theme.TEXT)
+          .placeholderColor($r('sys.color.font_tertiary'))
+          .fontColor($r('sys.color.font_primary'))
           .fontSize(13)
-          .backgroundColor(Theme.INPUT_BG)
-          .borderRadius(10)
-          .border({ width: 1, color: Theme.BORDER })
+          .backgroundColor($r('sys.color.comp_background_tertiary'))
+          .borderRadius(AppRadius.Md)
+          .border({ width: 1, color: AppColor.Divider })
           .height(76)
           .onChange((value: string) => {
             this.formComment = value

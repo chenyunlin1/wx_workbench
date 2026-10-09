@@ -1,4 +1,4 @@
-import { Theme } from './Theme'
+import { AppAppearance } from '../model/AppAppearance'
 
 /**
  * AI 回复的轻量 markdown 渲染。鸿蒙这个 SDK 版本没有内置 Markdown 组件，
@@ -10,6 +10,18 @@ export class MdSpan {
   code: boolean = false
   size: number = 14
   color: string = ''
+}
+
+/** 链接色跟随主题色；Span 只吃字符串色值，所以这里读当前强调色的 hex。 */
+function brandHex(): string {
+  const accent: string = AppAppearance.current.accent
+  return accent.length > 0 ? accent : AppAppearance.defaultAccent
+}
+
+/** 引用块文字色：Span 只吃 hex，按深浅模式取一档静态灰。 */
+function themeQuoteHex(): string {
+  const mode = AppStorage.get<string>('colorMode')
+  return mode === 'light' ? '#7A7A7A' : '#9BA0A8'
 }
 
 function makeSpan(text: string, bold: boolean, code: boolean, size: number, color: string): MdSpan {
@@ -81,7 +93,7 @@ function pushInline(target: MdSpan[], raw: string, bold: boolean, size: number, 
       if (close > index && tail > close) {
         pushPlain(target, buffer, bold, size, color)
         buffer = ''
-        pushPlain(target, raw.substring(index + 1, close), bold, size, Theme.PRIMARY)
+        pushPlain(target, raw.substring(index + 1, close), bold, size, brandHex())
         index = tail + 1
         continue
       }
@@ -130,7 +142,7 @@ export function parseMarkdown(raw: string, baseSize: number): MdSpan[] {
       continue
     }
     if (inFence) {
-      spans.push(makeSpan(line, false, true, baseSize - 1, Theme.TEXT_SUB))
+      spans.push(makeSpan(line, false, true, baseSize - 1, ''))
       spans.push(makeSpan('\n', false, false, baseSize, ''))
       continue
     }
@@ -159,7 +171,7 @@ export function parseMarkdown(raw: string, baseSize: number): MdSpan[] {
 
     if (text.startsWith('> ')) {
       text = text.substring(2)
-      color = Theme.TEXT_SUB
+      color = themeQuoteHex()
     }
 
     if (text.startsWith('- ') || text.startsWith('* ')) {

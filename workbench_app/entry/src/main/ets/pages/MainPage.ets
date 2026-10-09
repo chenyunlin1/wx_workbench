@@ -1,125 +1,167 @@
-import { Theme } from '../common/Theme'
-import { HomeTab } from './tabs/HomeTab'
-import { NotesTab } from './tabs/NotesTab'
-import { LearningTab } from './tabs/LearningTab'
-import { AiTab } from './tabs/AiTab'
-import { ProfileTab } from './tabs/ProfileTab'
-import { SchedulesPage } from './feature/SchedulesPage'
-import { HabitsPage } from './feature/HabitsPage'
-import { WorkoutPage } from './feature/WorkoutPage'
-import { FinancePage } from './feature/FinancePage'
-import { CollectionPage } from './feature/CollectionPage'
-import { InterviewsPage } from './feature/InterviewsPage'
-import { PracticePage } from './feature/PracticePage'
-import { ShoppingPage } from './feature/ShoppingPage'
-import { UsersPage } from './feature/UsersPage'
-import { KnowledgeDetailPage } from './feature/KnowledgeDetailPage'
+import { SymbolGlyphModifier } from '@kit.ArkUI';
+import { HdsTabs, HdsTabsController, HdsTabsFloatingStyle } from '@kit.UIDesignKit';
+import { HdsCompat, CompatibleTabsModifier } from '../utils/HdsCompat';
+import { PlatformCompat } from '../utils/PlatformCompat';
+import { WindowUtils } from '../utils/WindowUtils';
+import { AppColor, HomeTheme } from '../theme/Theme';
+import { PreferenceService } from '../service/PreferenceService';
+import { HomeTab } from './tabs/HomeTab';
+import { NotesTab } from './tabs/NotesTab';
+import { LearningTab } from './tabs/LearningTab';
+import { AiTab } from './tabs/AiTab';
+import { ProfilePage } from './ProfilePage';
 
-/**
- * tabBar 的自定义构建参数。
- * 必须以对象字面量按引用传入：@Builder 按值传参时状态变量变化不会刷新子树，
- * 选中态就会永远停在初始值上。
- */
-interface TabBarItemParam {
-  index: number
-  icon: string
-  label: string
-  activeIndex: number
-}
+const FLOATING_BOTTOM: number = 4;
+const FLOATING_MIN_SAFE_BOTTOM: number = 8;
+const TAB_COUNT: number = 5;
 
-@Component
+@ComponentV2
 export struct MainPage {
-  @Provide('nav') nav: NavPathStack = new NavPathStack()
-  @StorageLink('navBarHeight') navBarHeight: number = 0
-  @State currentTab: number = 0
+  @Param navStack: NavPathStack = new NavPathStack();
+  @Local currentTab: number = 0;
+  @Local viewportWidth: number = 0;
+  @Local bottomSafeVp: number = WindowUtils.getBottomSafeVp();
 
-  @Builder
-  tabBarItem(item: TabBarItemParam) {
-    Column() {
-      Column({ space: 3 }) {
-        Text(item.icon)
-          .fontSize(20)
-          .opacity(item.activeIndex === item.index ? 1 : 0.45)
-        Text(item.label)
-          .fontSize(10)
-          .fontWeight(item.activeIndex === item.index ? FontWeight.Bold : FontWeight.Normal)
-          .fontColor(item.activeIndex === item.index ? Theme.CYAN : Theme.TEXT_FAINT)
-      }
-      .width('100%')
-      .height(58)
-      .justifyContent(FlexAlign.Center)
-    }
-    .width('100%')
-    .height('100%')
-    .justifyContent(FlexAlign.Start)
+  private tabController: HdsTabsController = new HdsTabsController();
+  /** 各 Tab 页的滚动控制器，用于双击 Tab 回顶部 */
+  private scrollers: Map<number, Scroller> = new Map();
+  /** 上一次 Tab 点击时间，用于双击检测 */
+  private lastTabClickTime: number = 0;
+  private lastTabClickIndex: number = -1;
+  private safeAreaChangeHandler: (topVp: number, bottomVp: number) => void =
+    (_topVp: number, bottomVp: number): void => {
+      if (Math.abs(this.bottomSafeVp - bottomVp) < 0.1) return;
+      this.bottomSafeVp = bottomVp;
+    };
+
+  aboutToAppear(): void {
+    WindowUtils.setStatusBarLight(false);
+    WindowUtils.addSafeAreaListener(this.safeAreaChangeHandler);
+    WindowUtils.refreshAvoidArea();
+    this.restoreDefaultTab();
   }
 
-  @Builder
-  PageMap(name: string, param: object) {
-    if (name === 'schedules') {
-      SchedulesPage()
-    } else if (name === 'habits') {
-      HabitsPage()
-    } else if (name === 'workout') {
-      WorkoutPage()
-    } else if (name === 'finance') {
-      FinancePage()
-    } else if (name === 'collection') {
-      CollectionPage()
-    } else if (name === 'interviews') {
-      InterviewsPage()
-    } else if (name === 'practice') {
-      PracticePage()
-    } else if (name === 'shopping') {
-      ShoppingPage()
-    } else if (name === 'users') {
-      UsersPage()
-    } else if (name === 'knowledgeDetail') {
-      KnowledgeDetailPage()
-    }
+  aboutToDisappear(): void {
+    WindowUtils.removeSafeAreaListener(this.safeAreaChangeHandler);
+  }
+
+  private handleViewportSizeChange(newValue: SizeOptions): void {
+    if (typeof newValue.width !== 'number') return;
+    const width: number = newValue.width;
+    if (Math.abs(width - this.viewportWidth) < 1) return;
+    this.viewportWidth = width;
+  }
+
+  private async restoreDefaultTab(): Promise<void> {
+    const idx = await PreferenceService.getDefaultTab();
+    if (idx <= 0 || idx >= TAB_COUNT) return;
+    setTimeout(() => {
+      this.changeTab(idx);
+    }, 50);
+  }
+
+  /** 统一切 Tab 入口，让默认页恢复和页面内跳转都走 HdsTabs 原生切换。 */
+  private changeTab(index: number): void {
+    if (index < 0 || index >= TAB_COUNT || index === this.currentTab) return;
+    this.tabController.changeIndex(index);
+  }
+
+  private buildTabBar(icon: Resource, label: ResourceStr): BottomTabBarStyle {
+    return new BottomTabBarStyle(
+      {
+        normal: new SymbolGlyphModifier(icon).fontColor([$r('sys.color.font_primary')]).fontSize(24),
+        selected: new SymbolGlyphModifier(icon).fontColor([AppColor.Brand]).fontSize(26)
+      },
+      label
+    ).labelStyle({
+      unselectedColor: $r('sys.color.font_primary'),
+      selectedColor: AppColor.Brand
+    });
+  }
+
+  private floatingBarStyle(): HdsTabsFloatingStyle | undefined {
+    if (!PlatformCompat.floatingTabs) return undefined;
+    return {
+      // 宽窗口保留底部导航习惯，避免页签横跨整块屏幕。
+      barSideMargin: Math.max(16, (this.viewportWidth - 720) / 2),
+      barBottomMargin: Math.max(this.bottomSafeVp, FLOATING_MIN_SAFE_BOTTOM) + FLOATING_BOTTOM,
+      gradientMask: { maskColor: $r('app.color.floating_bar_mask'), maskHeight: 92 },
+      systemMaterialEffect: HdsCompat.adaptiveMaterial,
+      // 保留随主题色变化的沉浸光感。
+      lightColor: AppColor.Brand,
+      // 智感握持：左右手自动跟手
+      adaptToHandedness: true
+    };
   }
 
   build() {
-    Navigation(this.nav) {
-      Tabs({ barPosition: BarPosition.End, index: $$this.currentTab }) {
-        TabContent() {
-          HomeTab()
-        }
-        .tabBar(this.tabBarItem({ index: 0, icon: '🏠', label: '首页', activeIndex: this.currentTab }))
-
-        TabContent() {
-          NotesTab()
-        }
-        .tabBar(this.tabBarItem({ index: 1, icon: '📝', label: '备忘', activeIndex: this.currentTab }))
-
-        TabContent() {
-          LearningTab()
-        }
-        .tabBar(this.tabBarItem({ index: 2, icon: '📚', label: '学习', activeIndex: this.currentTab }))
-
-        TabContent() {
-          AiTab()
-        }
-        .tabBar(this.tabBarItem({ index: 3, icon: '🤖', label: 'AI', activeIndex: this.currentTab }))
-
-        TabContent() {
-          ProfileTab()
-        }
-        .tabBar(this.tabBarItem({ index: 4, icon: '👤', label: '我的', activeIndex: this.currentTab }))
+    HdsTabs({ controller: this.tabController }) {
+      TabContent() {
+        HomeTab({
+          nav: this.navStack,
+          onScrollerReady: (scroller: Scroller): void => { this.scrollers.set(0, scroller); }
+        })
       }
-      .scrollable(true)
-      // 栏高加上手势条避让高度：Tab 栏底色一直铺到屏幕底，底部整块一个颜色
-      .barHeight(58 + this.navBarHeight)
-      .barBackgroundColor(Theme.TAB_BAR)
-      .width('100%')
-      .height('100%')
+      .tabBar(this.buildTabBar($r('sys.symbol.house_fill'), $r('app.string.tab_home')))
+
+      TabContent() {
+        NotesTab({
+          nav: this.navStack,
+          onScrollerReady: (scroller: Scroller): void => { this.scrollers.set(1, scroller); }
+        })
+      }
+      .tabBar(this.buildTabBar($r('sys.symbol.bookmark_fill'), $r('app.string.tab_notes')))
+
+      TabContent() {
+        LearningTab({
+          nav: this.navStack,
+          onScrollerReady: (scroller: Scroller): void => { this.scrollers.set(2, scroller); }
+        })
+      }
+      .tabBar(this.buildTabBar($r('sys.symbol.graduationcap_fill'), $r('app.string.tab_learning')))
+
+      TabContent() {
+        AiTab({
+          onScrollerReady: (scroller: Scroller): void => { this.scrollers.set(3, scroller); }
+        })
+      }
+      .tabBar(this.buildTabBar($r('sys.symbol.message_fill'), $r('app.string.tab_ai')))
+
+      TabContent() {
+        ProfilePage({
+          navStack: this.navStack,
+          onScrollerReady: (scroller: Scroller): void => { this.scrollers.set(4, scroller); }
+        })
+      }
+      .tabBar(this.buildTabBar($r('sys.symbol.person_fill'), $r('app.string.tab_profile')))
     }
-    .navDestination(this.PageMap)
-    .mode(NavigationMode.Stack)
-    .hideTitleBar(true)
-    .hideToolBar(true)
+    .barOverlap(true)
+    .barPosition(BarPosition.End)
+    .vertical(false)
+    .attributeModifier(new CompatibleTabsModifier(this.floatingBarStyle(), 56 + this.bottomSafeVp))
+    .onTabBarClick((index: number) => {
+      const now = Date.now();
+      const DOUBLE_TAP_DELAY = 300;
+      if (index === this.lastTabClickIndex && (now - this.lastTabClickTime) < DOUBLE_TAP_DELAY) {
+        // 双击当前 Tab → 滚动回顶部
+        const scroller = this.scrollers.get(index);
+        if (scroller) {
+          try { scroller.scrollEdge(Edge.Top); } catch (_e) { /* ignore */ }
+        }
+      }
+      this.lastTabClickTime = now;
+      this.lastTabClickIndex = index;
+    })
+    .onChange((index: number) => {
+      this.currentTab = index;
+    })
+    .animationDuration(300)
     .width('100%')
     .height('100%')
-    .backgroundColor(Theme.BG)
+    .backgroundColor(HomeTheme.BgNeutral)
+    .expandSafeArea([SafeAreaType.SYSTEM], [SafeAreaEdge.TOP, SafeAreaEdge.BOTTOM])
+    .onSizeChange((_oldValue: SizeOptions, newValue: SizeOptions) => {
+      this.handleViewportSizeChange(newValue);
+    })
   }
 }

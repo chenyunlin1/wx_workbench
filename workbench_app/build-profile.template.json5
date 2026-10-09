@@ -1,0 +1,57 @@
+// 公共构建配置：最低 HarmonyOS 6.1.1 / API 24；签名在本机 DevEco Studio 中配置。
+{
+  "app": {
+    "signingConfigs": [],
+    "products": [
+      {
+        "name": "default",
+        "bundleName": "com.wanxiang.workbench.app",
+        "targetSdkVersion": "26.0.0",
+        "compatibleSdkVersion": "6.1.1(24)",
+        "runtimeOS": "HarmonyOS",
+        "buildOption": {
+          "strictMode": {
+            "caseSensitiveCheck": true,
+            "useNormalizedOHMUrl": true
+          }
+        }
+      },
+      {
+        "name": "release",
+        "bundleName": "com.wanxiang.workbench.app",
+        "targetSdkVersion": "26.0.0",
+        "compatibleSdkVersion": "6.1.1(24)",
+        "runtimeOS": "HarmonyOS",
+        "buildOption": {
+          "strictMode": {
+            "caseSensitiveCheck": true,
+            "useNormalizedOHMUrl": true
+          }
+        }
+      }
+    ],
+    "buildModeSet": [
+      {
+        "name": "debug"
+      },
+      {
+        "name": "release"
+      }
+    ]
+  },
+  "modules": [
+    {
+      "name": "entry",
+      "srcPath": "./entry",
+      "targets": [
+        {
+          "name": "default",
+          "applyToProducts": [
+            "default",
+            "release"
+          ]
+        }
+      ]
+    }
+  ]
+}

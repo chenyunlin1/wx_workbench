@@ -1,10 +1,8 @@
 {
   "name": "entry",
   "version": "1.0.0",
-  "description": "Please describe the basic information.",
+  "description": "应用主模块",
   "main": "",
-  "author": "",
-  "license": "",
-  "dependencies": {}
+  "author": "ylwang",
+  "license": "MIT"
 }
-

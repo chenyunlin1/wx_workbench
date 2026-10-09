@@ -1,41 +1,42 @@
 import { Fmt, toast } from '../../common/AppKit'
 import { Api, HabitPayload, HealthPayload } from '../../api/Api'
 import { Theme } from '../../common/Theme'
+import { AppColor, AppFont, AppMaterial, AppRadius, AppSpace } from '../../theme/Theme'
 import { Session } from '../../store/Session'
 import { HabitRecentDay, HabitStatItem, HabitStats, WeightRecord } from '../../model/Models'
-import { EmptyView, PAGE_PAD_H, PAGE_SCROLL_BOTTOM, PageHeader, SectionTitle, SheetDelete, SHEET_PAD_BOTTOM, SHEET_PAD_TOP, SheetHeader, SheetSubmit, StatTile, TechCard } from '../../components/Ui'
+import { EmptyView, PAGE_PAD_H, PAGE_SCROLL_BOTTOM, PageHeader, PillButton, SectionTitle, SheetDelete, SHEET_PAD_BOTTOM, SHEET_PAD_TOP, SheetHeader, SheetSubmit, StatTile, TechCard } from '../../components/Ui'
 
 const HABIT_ICONS: string[] = ['💧', '🏃', '📚', '💪', '🧘', '🥗', '😴', '☀️', '📝', '🎯']
 
-@Component
+@ComponentV2
 export struct HabitsPage {
-  @Consume('nav') nav: NavPathStack
-  @State stats: HabitStats | null = null
-  @State weights: WeightRecord[] = []
-  @State refreshing: boolean = false
-  @State loading: boolean = true
+  @Param nav: NavPathStack = new NavPathStack();
+  @Local stats: HabitStats | null = null;
+  @Local weights: WeightRecord[] = [];
+  @Local refreshing: boolean = false;
+  @Local loading: boolean = true;
   // 习惯表单
-  @State showHabitForm: boolean = false
-  @State habitFormId: number = 0
-  @State habitName: string = ''
-  @State habitIconIndex: number = 0
+  @Local showHabitForm: boolean = false;
+  @Local habitFormId: number = 0;
+  @Local habitName: string = '';
+  @Local habitIconIndex: number = 0;
   // 体重表单
-  @State showWeightForm: boolean = false
-  @State weightFormId: number = 0
-  @State weightValue: string = ''
-  @State weightDate: string = Fmt.today()
+  @Local showWeightForm: boolean = false;
+  @Local weightFormId: number = 0;
+  @Local weightValue: string = '';
+  @Local weightDate: string = Fmt.today();
 
   aboutToAppear(): void {
     this.reload()
   }
 
-  reload(): void {
-    Api.habitStats(14).then((data) => {
+  private reload(): void {
+    Api.habitStats(14).then((data: HabitStats) => {
       this.stats = data
     }).catch((err: Object) => {
       toast(err instanceof Error ? err.message : '加载失败')
     })
-    Api.listHealth().then((list) => {
+    Api.listHealth().then((list: WeightRecord[]) => {
       this.weights = list
     }).catch(() => {
     }).finally(() => {
@@ -44,26 +45,26 @@ export struct HabitsPage {
     })
   }
 
-  latestWeight(): WeightRecord | null {
+  private latestWeight(): WeightRecord | null {
     if (this.weights.length === 0) {
       return null
     }
     return this.weights[0]
   }
 
-  latestWeightText(): string {
+  private latestWeightText(): string {
     const latest = this.latestWeight()
     return latest === null ? '-' : latest.weight + ' kg'
   }
 
-  weightDelta(): number {
+  private weightDelta(): number {
     if (this.weights.length < 2) {
       return 0
     }
     return this.weights[0].weight - this.weights[1].weight
   }
 
-  toggleCheckIn(item: HabitStatItem): void {
+  private toggleCheckIn(item: HabitStatItem): void {
     const call = item.checkedToday ? Api.cancelCheckIn(item.id) : Api.checkInHabit(item.id)
     call.then(() => {
       toast(item.checkedToday ? '已取消今日打卡' : '打卡成功 🔥')
@@ -74,21 +75,21 @@ export struct HabitsPage {
     })
   }
 
-  openHabitCreate(): void {
+  private openHabitCreate(): void {
     this.habitFormId = 0
     this.habitName = ''
     this.habitIconIndex = 0
     this.showHabitForm = true
   }
 
-  openHabitEdit(item: HabitStatItem): void {
+  private openHabitEdit(item: HabitStatItem): void {
     this.habitFormId = item.id
     this.habitName = item.name
     this.habitIconIndex = Math.max(0, HABIT_ICONS.indexOf(item.icon))
     this.showHabitForm = true
   }
 
-  saveHabit(): void {
+  private saveHabit(): void {
     if (this.habitName.trim().length === 0) {
       toast('请输入习惯名称')
       return
@@ -107,7 +108,7 @@ export struct HabitsPage {
     })
   }
 
-  removeHabit(id: number): void {
+  private removeHabit(id: number): void {
     Api.deleteHabit(id).then(() => {
       toast('已删除')
       this.showHabitForm = false
@@ -117,21 +118,21 @@ export struct HabitsPage {
     })
   }
 
-  openWeightCreate(): void {
+  private openWeightCreate(): void {
     this.weightFormId = 0
     this.weightValue = ''
     this.weightDate = Fmt.today()
     this.showWeightForm = true
   }
 
-  openWeightEdit(record: WeightRecord): void {
+  private openWeightEdit(record: WeightRecord): void {
     this.weightFormId = record.id
     this.weightValue = record.weight.toString()
     this.weightDate = record.recordDate
     this.showWeightForm = true
   }
 
-  pickWeightDate(): void {
+  private pickWeightDate(): void {
     const base = this.weightDate.length === 10 ? Fmt.parse(this.weightDate + ' 09:00:00') : new Date()
     DatePickerDialog.show({
       start: new Date(2020, 0, 1),
@@ -143,7 +144,7 @@ export struct HabitsPage {
     })
   }
 
-  saveWeight(): void {
+  private saveWeight(): void {
     const weight = parseFloat(this.weightValue)
     if (isNaN(weight) || weight <= 0 || weight > 500) {
       toast('请输入有效的体重（kg）')
@@ -163,7 +164,7 @@ export struct HabitsPage {
     })
   }
 
-  removeWeight(id: number): void {
+  private removeWeight(id: number): void {
     Api.deleteHealth(id).then(() => {
       toast('已删除')
       this.showWeightForm = false
@@ -174,12 +175,11 @@ export struct HabitsPage {
   }
 
   build() {
-    NavDestination() {
     Stack() {
       Refresh({ refreshing: $$this.refreshing }) {
         Scroll() {
           Column() {
-            PageHeader({ title: '习惯健康' })
+            PageHeader({ navStack: this.nav, title: '习惯健康' })
 
             // 概览
             Row({ space: 10 }) {
@@ -188,13 +188,13 @@ export struct HabitsPage {
                 value: this.stats === null ? '-' :
                 this.stats.today.checked + '/' + this.stats.today.total,
                 label: '今日打卡',
-                accent: Theme.MINT
+                accent: AppColor.Brand
               })
               StatTile({ weighted: true,
                 icon: '📈',
                 value: this.stats === null ? '-' : Math.round(this.stats.week.rate * 100) + '%',
                 label: '本周完成率',
-                accent: Theme.CYAN
+                accent: AppColor.Brand
               })
             }
             .width('100%')
@@ -209,7 +209,7 @@ export struct HabitsPage {
                 icon: '✅',
                 value: this.stats === null ? '-' : this.stats.totalChecked.toString(),
                 label: '近14天打卡',
-                accent: Theme.VIOLET
+                accent: AppColor.BrandDark
               })
             }
             .width('100%')
@@ -219,11 +219,12 @@ export struct HabitsPage {
             Column() {
               SectionTitle({ title: '我的习惯' })
               Text('＋ 新习惯')
-                .fontSize(12)
-                .fontColor('#FFFFFF')
-                .padding({ left: 12, right: 12, top: 7, bottom: 7 })
-                .borderRadius(11)
-                .linearGradient({ angle: 135, colors: Theme.BRAND_COLORS })
+                .fontSize(AppFont.Caption)
+                .fontWeight(FontWeight.Medium)
+                .fontColor(AppColor.OnBrand)
+                .padding({ left: AppSpace.Sm, right: AppSpace.Sm, top: 7, bottom: 7 })
+                .borderRadius(AppRadius.Pill)
+                .backgroundColor(AppColor.Brand)
             }
             .width('100%')
             .margin({ top: 18 })
@@ -237,15 +238,15 @@ export struct HabitsPage {
               ForEach(this.stats.habits, (item: HabitStatItem) => {
                 Column() {
                 TechCard() {
-                  Row({ space: 12 }) {
+                  Row({ space: AppSpace.Sm }) {
                     Text(item.icon)
                       .fontSize(26)
                     Column({ space: 5 }) {
-                      Row({ space: 8 }) {
+                      Row({ space: AppSpace.Xs }) {
                         Text(item.name)
-                          .fontSize(15)
+                          .fontSize(AppFont.BodyL)
                           .fontWeight(FontWeight.Bold)
-                          .fontColor(Theme.TEXT)
+                          .fontColor($r('sys.color.font_primary'))
                           .maxLines(1)
                           .textOverflow({ overflow: TextOverflow.Ellipsis })
                         Text('🔥 ' + item.streakDays)
@@ -259,35 +260,27 @@ export struct HabitsPage {
                             .width(12)
                             .height(12)
                             .borderRadius(3)
-                            .backgroundColor(day.checked ? Theme.MINT : Theme.BORDER)
+                            .backgroundColor(day.checked ? AppColor.Brand : AppColor.Divider)
                         }, (day: HabitRecentDay) => day.date)
                       }
                       Text('本周 ' + item.weekCount + '/7 · 完成率 ' + Math.round(item.rate * 100) + '%')
                         .fontSize(10)
-                        .fontColor(Theme.TEXT_FAINT)
+                        .fontColor($r('sys.color.font_tertiary'))
                     }
                     .alignItems(HorizontalAlign.Start)
                     .layoutWeight(1)
 
                     Column({ space: 6 }) {
-                      Text(item.checkedToday ? '已打卡' : '打 卡')
-                        .fontSize(12)
-                        .fontWeight(FontWeight.Bold)
-                        .fontColor('#FFFFFF')
-                        .width(58)
-                        .height(32)
-                        .textAlign(TextAlign.Center)
-                        .borderRadius(16)
-                        .linearGradient({
-                          angle: 135,
-                          colors: item.checkedToday ? Theme.CARD_COLORS : Theme.MINT_COLORS
-                        })
-                        .onClick(() => {
+                      PillButton({
+                        label: item.checkedToday ? '已打卡' : '打 卡',
+                        filled: !item.checkedToday,
+                        onTap: (): void => {
                           this.toggleCheckIn(item)
-                        })
+                        }
+                      })
                       Text('✎')
-                        .fontSize(13)
-                        .fontColor(Theme.TEXT_FAINT)
+                        .fontSize(AppFont.BodyL)
+                        .fontColor($r('sys.color.font_tertiary'))
                         .onClick(() => {
                           this.openHabitEdit(item)
                         })
@@ -297,22 +290,23 @@ export struct HabitsPage {
                 }
                 }
                   .width('100%')
-                .margin({ bottom: 10 })
+                .margin({ bottom: AppSpace.Xs })
               }, (item: HabitStatItem) => item.id.toString() + '-' + item.checkedToday.toString())
             }
 
             // 体重
-            Row({ space: 10 }) {
+            Row({ space: AppSpace.Xs }) {
               Column() {
                 SectionTitle({ title: '健康体重' })
               }
               .layoutWeight(1)
               Text('＋ 记录')
-                .fontSize(12)
-                .fontColor('#FFFFFF')
-                .padding({ left: 12, right: 12, top: 7, bottom: 7 })
-                .borderRadius(11)
-                .linearGradient({ angle: 135, colors: Theme.MINT_COLORS })
+                .fontSize(AppFont.Caption)
+                .fontWeight(FontWeight.Medium)
+                .fontColor(AppColor.OnBrand)
+                .padding({ left: AppSpace.Sm, right: AppSpace.Sm, top: 7, bottom: 7 })
+                .borderRadius(AppRadius.Pill)
+                .backgroundColor(AppColor.Brand)
                 .margin({ bottom: 10 })
                 .onClick(() => {
                   this.openWeightCreate()
@@ -330,31 +324,31 @@ export struct HabitsPage {
                   Column({ space: 4 }) {
                     Text('最新体重')
                       .fontSize(10)
-                      .fontColor(Theme.TEXT_SUB)
+                      .fontColor($r('sys.color.font_secondary'))
                     Text(this.latestWeightText())
                       .fontSize(19)
                       .fontWeight(FontWeight.Bold)
-                      .fontColor(Theme.MINT)
+                      .fontColor(AppColor.Brand)
                   }
                   .alignItems(HorizontalAlign.Start)
                   Column({ space: 4 }) {
                     Text('较上次')
                       .fontSize(10)
-                      .fontColor(Theme.TEXT_SUB)
+                      .fontColor($r('sys.color.font_secondary'))
                     Text((this.weightDelta() >= 0 ? '+' : '') + this.weightDelta().toFixed(1) + ' kg')
                       .fontSize(19)
                       .fontWeight(FontWeight.Bold)
-                      .fontColor(this.weightDelta() > 0 ? Theme.DANGER : this.weightDelta() < 0 ? Theme.SUCCESS : Theme.TEXT_SUB)
+                      .fontColor(this.weightDelta() > 0 ? Theme.DANGER : this.weightDelta() < 0 ? Theme.SUCCESS : $r('sys.color.font_secondary'))
                   }
                   .alignItems(HorizontalAlign.Start)
                   Column({ space: 4 }) {
                     Text('记录数')
                       .fontSize(10)
-                      .fontColor(Theme.TEXT_SUB)
+                      .fontColor($r('sys.color.font_secondary'))
                     Text(this.weights.length.toString())
                       .fontSize(19)
                       .fontWeight(FontWeight.Bold)
-                      .fontColor(Theme.CYAN)
+                      .fontColor(AppColor.Brand)
                   }
                   .alignItems(HorizontalAlign.Start)
                 }
@@ -362,18 +356,18 @@ export struct HabitsPage {
               }
               }
                 .width('100%')
-              .margin({ bottom: 10 })
+              .margin({ bottom: AppSpace.Xs })
 
               ForEach(this.weights.slice(0, 15), (record: WeightRecord, index: number) => {
                 Row({ space: 10 }) {
                   Text(Fmt.dateOnly(record.recordDate))
-                    .fontSize(12)
-                    .fontColor(Theme.TEXT_SUB)
+                    .fontSize(AppFont.Caption)
+                    .fontColor($r('sys.color.font_secondary'))
                     .layoutWeight(1)
                   Text(record.weight.toFixed(1) + ' kg')
-                    .fontSize(13)
+                    .fontSize(AppFont.Body)
                     .fontWeight(FontWeight.Bold)
-                    .fontColor(Theme.TEXT)
+                    .fontColor($r('sys.color.font_primary'))
                   if (index < Math.min(15, this.weights.length) - 1) {
                     Text((record.weight - this.weights[index + 1].weight >= 0 ? '+' : '') +
                     (record.weight - this.weights[index + 1].weight).toFixed(1))
@@ -385,18 +379,18 @@ export struct HabitsPage {
                     Text('').width(52)
                   }
                   Text('✎')
-                    .fontSize(12)
-                    .fontColor(Theme.TEXT_FAINT)
+                    .fontSize(AppFont.Body)
+                    .fontColor($r('sys.color.font_tertiary'))
                     .onClick(() => {
                       this.openWeightEdit(record)
                     })
                 }
                 .width('100%')
                 .padding({ top: 9, bottom: 9, left: 14, right: 14 })
-                .borderRadius(12)
-                .backgroundColor(Theme.CARD_SOLID)
-                .border({ width: 1, color: Theme.BORDER })
-                .margin({ bottom: 8 })
+                .borderRadius(AppRadius.Md)
+                .backgroundColor($r('sys.color.comp_background_primary'))
+                .border({ width: 1, color: AppColor.Divider })
+                .margin({ bottom: AppSpace.Xs })
               }, (record: WeightRecord) => record.id.toString() + '-' + record.weight.toString())
             }
           }
@@ -410,23 +404,26 @@ export struct HabitsPage {
       .onRefreshing(() => {
         this.reload()
       })
-      .bindSheet($$this.showWeightForm, this.weightFormBuilder(), {
-        height: 460,
-        dragBar: true,
-        backgroundColor: Theme.CARD_SOLID
-      })
     }
     .width('100%')
     .height('100%')
-    .backgroundColor(Theme.BG)
-    }
-    .hideTitleBar(true)
-    .backgroundColor(Theme.BG)
+    .backgroundColor($r('sys.color.background_primary'))
+    .bindSheet($$this.showWeightForm, this.weightFormBuilder(), {
+      height: 460,
+      dragBar: true,
+      preferType: SheetType.BOTTOM,
+      backgroundColor: AppMaterial.SheetBackground,
+      blurStyle: AppMaterial.SheetBlur,
+      systemMaterial: AppMaterial.Sheet
+    })
     // 习惯表单
     .bindSheet($$this.showHabitForm, this.habitFormBuilder(), {
       height: 460,
       dragBar: true,
-      backgroundColor: Theme.CARD_SOLID
+      preferType: SheetType.BOTTOM,
+      backgroundColor: AppMaterial.SheetBackground,
+      blurStyle: AppMaterial.SheetBlur,
+      systemMaterial: AppMaterial.Sheet
     })
   }
 
@@ -435,14 +432,13 @@ export struct HabitsPage {
     Column() {
       SheetHeader({ title: this.weightFormId === 0 ? '记录体重' : '编辑体重' })
 
-      Text('体重（kg）').fontSize(12).fontColor(Theme.TEXT_SUB).margin({ top: 14, bottom: 6 })
+      Text('体重（kg）').fontSize(AppFont.Caption).fontColor($r('sys.color.font_secondary')).margin({ top: 14, bottom: 6 })
       TextInput({ placeholder: '例如 65.5', text: this.weightValue })
-        .placeholderColor(Theme.TEXT_FAINT)
-        .fontColor(Theme.TEXT)
-        .fontSize(14)
-        .backgroundColor(Theme.INPUT_BG)
-        .borderRadius(10)
-        .border({ width: 1, color: Theme.BORDER })
+        .placeholderColor($r('sys.color.font_tertiary'))
+        .fontColor($r('sys.color.font_primary'))
+        .fontSize(AppFont.Body)
+        .backgroundColor($r('sys.color.comp_background_tertiary'))
+        .borderRadius(AppRadius.Md)
         .height(42)
         .align(Alignment.Start)
         .type(InputType.NUMBER_DECIMAL)
@@ -450,16 +446,15 @@ export struct HabitsPage {
           this.weightValue = value
         })
 
-      Text('日期').fontSize(12).fontColor(Theme.TEXT_SUB).margin({ top: 14, bottom: 6 })
+      Text('日期').fontSize(AppFont.Caption).fontColor($r('sys.color.font_secondary')).margin({ top: 14, bottom: 6 })
       Text(this.weightDate)
-        .fontSize(14)
-        .fontColor(Theme.CYAN)
+        .fontSize(AppFont.Body)
+        .fontColor(AppColor.Brand)
         .width('100%')
         .height(42)
         .padding({ left: 12 })
-        .borderRadius(10)
-        .backgroundColor(Theme.INPUT_BG)
-        .border({ width: 1, color: Theme.BORDER })
+        .borderRadius(AppRadius.Md)
+        .backgroundColor($r('sys.color.comp_background_tertiary'))
         .onClick(() => {
           this.pickWeightDate()
         })
@@ -493,21 +488,20 @@ export struct HabitsPage {
     Column() {
       SheetHeader({ title: this.habitFormId === 0 ? '新建习惯' : '编辑习惯' })
 
-      Text('名称').fontSize(12).fontColor(Theme.TEXT_SUB).margin({ top: 14, bottom: 6 })
+      Text('名称').fontSize(AppFont.Caption).fontColor($r('sys.color.font_secondary')).margin({ top: 14, bottom: 6 })
       TextInput({ placeholder: '例如：每天喝水 8 杯', text: this.habitName })
-        .placeholderColor(Theme.TEXT_FAINT)
-        .fontColor(Theme.TEXT)
-        .fontSize(14)
-        .backgroundColor(Theme.INPUT_BG)
-        .borderRadius(10)
-        .border({ width: 1, color: Theme.BORDER })
+        .placeholderColor($r('sys.color.font_tertiary'))
+        .fontColor($r('sys.color.font_primary'))
+        .fontSize(AppFont.Body)
+        .backgroundColor($r('sys.color.comp_background_tertiary'))
+        .borderRadius(AppRadius.Md)
         .height(42)
         .align(Alignment.Start)
         .onChange((value: string) => {
           this.habitName = value
         })
 
-      Text('图标').fontSize(12).fontColor(Theme.TEXT_SUB).margin({ top: 14, bottom: 6 })
+      Text('图标').fontSize(AppFont.Caption).fontColor($r('sys.color.font_secondary')).margin({ top: 14, bottom: 6 })
       Flex({ wrap: FlexWrap.Wrap }) {
         ForEach(HABIT_ICONS, (icon: string, index: number) => {
           Text(icon)
@@ -515,9 +509,9 @@ export struct HabitsPage {
             .width(44)
             .height(44)
             .textAlign(TextAlign.Center)
-            .borderRadius(12)
-            .backgroundColor(this.habitIconIndex === index ? Theme.PRIMARY_SOFT : Theme.INPUT_BG)
-            .border({ width: 2, color: this.habitIconIndex === index ? Theme.PRIMARY : Theme.BORDER })
+            .borderRadius(AppRadius.Md)
+            .backgroundColor(this.habitIconIndex === index ? AppColor.BrandSoft : $r('sys.color.comp_background_tertiary'))
+            .border({ width: 2, color: this.habitIconIndex === index ? AppColor.Brand : AppColor.Divider })
             .margin({ right: 8, bottom: 8 })
             .onClick(() => {
               this.habitIconIndex = index

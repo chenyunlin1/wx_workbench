@@ -1,11 +1,12 @@
 import { Fmt, Options, toast } from '../../common/AppKit'
 import { Api } from '../../api/Api'
 import { Theme } from '../../common/Theme'
+import { AppColor, AppFont, AppMaterial, AppRadius, AppSpace } from '../../theme/Theme'
 import { Session } from '../../store/Session'
 import { Interview, InterviewPayload } from '../../model/Models'
 import { EmptyView, OptionChips, PAGE_PAD_H, PAGE_SCROLL_BOTTOM, PageHeader, SheetDelete, SHEET_PAD_BOTTOM, SHEET_PAD_TOP, SheetHeader, SheetSubmit, TechCard } from '../../components/Ui'
 
-function statusColor(status: string): string {
+function statusColor(status: string): ResourceColor {
   if (status === 'passed') {
     return Theme.SUCCESS
   }
@@ -13,32 +14,32 @@ function statusColor(status: string): string {
     return Theme.DANGER
   }
   if (status === 'cancelled') {
-    return Theme.TEXT_FAINT
+    return $r('sys.color.font_tertiary')
   }
   return Theme.WARN
 }
 
-@Component
+@ComponentV2
 export struct InterviewsPage {
-  @Consume('nav') nav: NavPathStack
-  @State interviews: Interview[] = []
-  @State statusIndex: number = 0
-  @State refreshing: boolean = false
-  @State loading: boolean = true
-  @State showForm: boolean = false
-  @State formId: number = 0
-  @State formCompany: string = ''
-  @State formPosition: string = ''
-  @State formTime: string = Fmt.dateTime(new Date())
-  @State formStatusIndex: number = 0
-  @State saving: boolean = false
+  @Param nav: NavPathStack = new NavPathStack();
+  @Local interviews: Interview[] = [];
+  @Local statusIndex: number = 0;
+  @Local refreshing: boolean = false;
+  @Local loading: boolean = true;
+  @Local showForm: boolean = false;
+  @Local formId: number = 0;
+  @Local formCompany: string = '';
+  @Local formPosition: string = '';
+  @Local formTime: string = Fmt.dateTime(new Date());
+  @Local formStatusIndex: number = 0;
+  @Local saving: boolean = false;
 
   aboutToAppear(): void {
     this.reload()
   }
 
-  reload(): void {
-    Api.listInterviews().then((list) => {
+  private reload(): void {
+    Api.listInterviews().then((list: Interview[]) => {
       this.interviews = list.sort((a: Interview, b: Interview) => b.interviewTime.localeCompare(a.interviewTime))
     }).catch((err: Object) => {
       toast(err instanceof Error ? err.message : '加载失败')
@@ -48,7 +49,7 @@ export struct InterviewsPage {
     })
   }
 
-  filtered(): Interview[] {
+  private filtered(): Interview[] {
     if (this.statusIndex === 0) {
       return this.interviews
     }
@@ -56,7 +57,7 @@ export struct InterviewsPage {
     return this.interviews.filter((i: Interview) => i.status === target)
   }
 
-  openCreate(): void {
+  private openCreate(): void {
     this.formId = 0
     this.formCompany = ''
     this.formPosition = ''
@@ -65,7 +66,7 @@ export struct InterviewsPage {
     this.showForm = true
   }
 
-  openEdit(item: Interview): void {
+  private openEdit(item: Interview): void {
     this.formId = item.id
     this.formCompany = item.company
     this.formPosition = item.position
@@ -74,7 +75,7 @@ export struct InterviewsPage {
     this.showForm = true
   }
 
-  pickTime(): void {
+  private pickTime(): void {
     const base = this.formTime.length >= 16 ? Fmt.parse(this.formTime) : new Date()
     DatePickerDialog.show({
       start: new Date(2020, 0, 1),
@@ -93,7 +94,7 @@ export struct InterviewsPage {
     })
   }
 
-  saveForm(): void {
+  private saveForm(): void {
     if (this.formCompany.trim().length === 0) {
       toast('请输入公司名称')
       return
@@ -120,7 +121,7 @@ export struct InterviewsPage {
     })
   }
 
-  removeInterview(id: number): void {
+  private removeInterview(id: number): void {
     Api.deleteInterview(id).then(() => {
       toast('已删除')
       this.showForm = false
@@ -131,14 +132,18 @@ export struct InterviewsPage {
   }
 
   build() {
-    NavDestination() {
     Stack() {
       Refresh({ refreshing: $$this.refreshing }) {
         Scroll() {
           Column() {
-            PageHeader({ title: '面试准备', actionLabel: '＋ 添加', onAction: (): void => {
-              this.openCreate()
-            } })
+            PageHeader({
+              navStack: this.nav,
+              title: '面试准备',
+              actionLabel: '＋ 添加',
+              onAction: (): void => {
+                this.openCreate()
+              }
+            })
 
             Row() {
               OptionChips({
@@ -161,44 +166,44 @@ export struct InterviewsPage {
                 ForEach(this.filtered(), (item: Interview) => {
                   ListItem() {
                     Column() {
-                    TechCard() {
-                      Row({ space: 12 }) {
-                        Column({ space: 5 }) {
-                          Text(item.company)
-                            .fontSize(16)
-                            .fontWeight(FontWeight.Bold)
-                            .fontColor(Theme.TEXT)
-                            .maxLines(1)
-                            .textOverflow({ overflow: TextOverflow.Ellipsis })
-                          Text(item.position)
-                            .fontSize(12)
-                            .fontColor(Theme.TEXT_SUB)
-                          Text(Fmt.dateTime(Fmt.parse(item.interviewTime)).replace(':00', ''))
-                            .fontSize(11)
-                            .fontColor(Theme.CYAN)
-                        }
-                        .alignItems(HorizontalAlign.Start)
-                        .layoutWeight(1)
+                      TechCard() {
+                        Row({ space: AppSpace.Sm }) {
+                          Column({ space: 5 }) {
+                            Text(item.company)
+                              .fontSize(AppFont.BodyL)
+                              .fontWeight(FontWeight.Bold)
+                              .fontColor($r('sys.color.font_primary'))
+                              .maxLines(1)
+                              .textOverflow({ overflow: TextOverflow.Ellipsis })
+                            Text(item.position)
+                              .fontSize(AppFont.Caption)
+                              .fontColor($r('sys.color.font_secondary'))
+                            Text(Fmt.dateTime(Fmt.parse(item.interviewTime)).replace(':00', ''))
+                              .fontSize(11)
+                              .fontColor(AppColor.Brand)
+                          }
+                          .alignItems(HorizontalAlign.Start)
+                          .layoutWeight(1)
 
-                        Column({ space: 6 }) {
-                          Text(Options.interviewStatusLabel(item.status))
-                            .fontSize(10)
-                            .fontColor(statusColor(item.status))
-                            .padding({ left: 8, right: 8, top: 3, bottom: 3 })
-                            .borderRadius(999)
-                            .border({ width: 1, color: statusColor(item.status) })
-                          Text('✎')
-                            .fontSize(13)
-                            .fontColor(Theme.TEXT_FAINT)
-                            .onClick(() => {
-                              this.openEdit(item)
-                            })
+                          Column({ space: 6 }) {
+                            Text(Options.interviewStatusLabel(item.status))
+                              .fontSize(10)
+                              .fontColor(statusColor(item.status))
+                              .padding({ left: 8, right: 8, top: 3, bottom: 3 })
+                              .borderRadius(AppRadius.Pill)
+                              .border({ width: 1, color: statusColor(item.status) })
+                            Text('✎')
+                              .fontSize(13)
+                              .fontColor($r('sys.color.font_tertiary'))
+                              .onClick(() => {
+                                this.openEdit(item)
+                              })
+                          }
                         }
+                        .width('100%')
                       }
-                      .width('100%')
                     }
-                    }
-                      .width('100%')
+                    .width('100%')
                     .margin({ bottom: 10 })
                   }
                 }, (item: Interview) => item.id.toString() + '-' + item.status)
@@ -223,15 +228,15 @@ export struct InterviewsPage {
     }
     .width('100%')
     .height('100%')
-    .backgroundColor(Theme.BG)
+    .backgroundColor($r('sys.color.background_primary'))
     .bindSheet($$this.showForm, this.formBuilder(), {
       height: 540,
       dragBar: true,
-      backgroundColor: Theme.CARD_SOLID
+      preferType: SheetType.BOTTOM,
+      backgroundColor: AppMaterial.SheetBackground,
+      blurStyle: AppMaterial.SheetBlur,
+      systemMaterial: AppMaterial.Sheet
     })
-    }
-    .hideTitleBar(true)
-    .backgroundColor(Theme.BG)
   }
 
   @Builder
@@ -239,47 +244,49 @@ export struct InterviewsPage {
     Column() {
       SheetHeader({ title: this.formId === 0 ? '添加面试' : '编辑面试' })
 
-      Text('公司').fontSize(12).fontColor(Theme.TEXT_SUB).margin({ top: 14, bottom: 6 })
+      Text('公司').fontSize(AppFont.Caption).fontColor($r('sys.color.font_secondary')).margin({ top: 14, bottom: 6 })
       TextInput({ placeholder: '公司名称', text: this.formCompany })
-        .fontColor(Theme.TEXT)
-        .fontSize(14)
-        .backgroundColor(Theme.INPUT_BG)
-        .borderRadius(10)
-        .border({ width: 1, color: Theme.BORDER })
+        .placeholderColor($r('sys.color.font_tertiary'))
+        .fontColor($r('sys.color.font_primary'))
+        .fontSize(AppFont.Body)
+        .backgroundColor($r('sys.color.comp_background_tertiary'))
+        .borderRadius(AppRadius.Md)
+        .border({ width: 1, color: AppColor.Divider })
         .height(42)
         .align(Alignment.Start)
         .onChange((value: string) => {
           this.formCompany = value
         })
 
-      Text('职位').fontSize(12).fontColor(Theme.TEXT_SUB).margin({ top: 12, bottom: 6 })
+      Text('职位').fontSize(AppFont.Caption).fontColor($r('sys.color.font_secondary')).margin({ top: 12, bottom: 6 })
       TextInput({ placeholder: '应聘职位', text: this.formPosition })
-        .fontColor(Theme.TEXT)
-        .fontSize(14)
-        .backgroundColor(Theme.INPUT_BG)
-        .borderRadius(10)
-        .border({ width: 1, color: Theme.BORDER })
+        .placeholderColor($r('sys.color.font_tertiary'))
+        .fontColor($r('sys.color.font_primary'))
+        .fontSize(AppFont.Body)
+        .backgroundColor($r('sys.color.comp_background_tertiary'))
+        .borderRadius(AppRadius.Md)
+        .border({ width: 1, color: AppColor.Divider })
         .height(42)
         .align(Alignment.Start)
         .onChange((value: string) => {
           this.formPosition = value
         })
 
-      Text('面试时间').fontSize(12).fontColor(Theme.TEXT_SUB).margin({ top: 12, bottom: 6 })
+      Text('面试时间').fontSize(AppFont.Caption).fontColor($r('sys.color.font_secondary')).margin({ top: 12, bottom: 6 })
       Text(this.formTime)
-        .fontSize(14)
-        .fontColor(Theme.CYAN)
+        .fontSize(AppFont.Body)
+        .fontColor(AppColor.Brand)
         .width('100%')
         .height(42)
         .padding({ left: 12 })
-        .borderRadius(10)
-        .backgroundColor(Theme.INPUT_BG)
-        .border({ width: 1, color: Theme.BORDER })
+        .borderRadius(AppRadius.Md)
+        .backgroundColor($r('sys.color.comp_background_tertiary'))
+        .border({ width: 1, color: AppColor.Divider })
         .onClick(() => {
           this.pickTime()
         })
 
-      Text('状态').fontSize(12).fontColor(Theme.TEXT_SUB).margin({ top: 12, bottom: 6 })
+      Text('状态').fontSize(AppFont.Caption).fontColor($r('sys.color.font_secondary')).margin({ top: 12, bottom: 6 })
       OptionChips({
         options: ['待进行', '通过', '未通过', '已取消'],
         selected: this.formStatusIndex,

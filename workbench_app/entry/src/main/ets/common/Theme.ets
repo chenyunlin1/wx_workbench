@@ -1,104 +1,108 @@
+import { AppColor } from '../theme/Theme'
+
 /**
- * 主题：跟随系统深浅色模式。
- * 所有颜色是动态 getter —— 组件每次重建时按当前模式取值；
- * 模式切换时 EntryAbility 更新 AppStorage 的 colorMode，Index 触发整树重建。
- * 值保持 hex 字符串，半透明场景统一用 softOf()。
+ * 业务页共用的语义色适配层：把旧版自定义色板统一收敛到模板设计系统。
+ * - 品牌相关色走 AppColor.*（随「设置 → 主题色」实时变化）
+ * - 中性色走 sys.color.* 系统资源（自动深浅色）
+ * - 语义色（优先级/警告/成功）保留手工色值，通过 isDark() 深浅分档
+ * 新增页面请直接使用 theme/Theme.ets 的 token。
  */
 export class Theme {
+  /** 由 EntryAbility 在启动与 onConfigurationUpdate 中同步到 AppStorage */
   static isDark(): boolean {
     const mode = AppStorage.get<string>('colorMode')
     return mode !== 'light'
   }
 
-  /* -------- 页面背景（纯色，保证与状态栏/导航条区域无缝） -------- */
+  /* -------- 页面背景 -------- */
 
-  static get BG(): string {
-    return this.isDark() ? '#060B16' : '#F3F6FB'
+  static get BG(): ResourceColor {
+    return $r('sys.color.background_primary')
   }
 
-  /* -------- 卡片 -------- */
+  /* -------- 卡片 / 输入 -------- */
 
-  static get CARD_TOP(): string {
-    return this.isDark() ? '#111F3A' : '#FFFFFF'
+  static get CARD_TOP(): ResourceColor {
+    return $r('sys.color.comp_background_primary')
   }
 
-  static get CARD_BOTTOM(): string {
-    return this.isDark() ? '#0C1730' : '#F7F9FE'
+  static get CARD_BOTTOM(): ResourceColor {
+    return $r('sys.color.comp_background_primary')
   }
 
-  static get CARD_SOLID(): string {
-    return this.isDark() ? '#0E1A32' : '#FFFFFF'
+  static get CARD_SOLID(): ResourceColor {
+    return $r('sys.color.comp_background_primary')
   }
 
-  static get INPUT_BG(): string {
-    return this.isDark() ? '#0B1730' : '#EEF2F9'
+  static get INPUT_BG(): ResourceColor {
+    return $r('sys.color.comp_background_tertiary')
   }
 
-  /* -------- 品牌色 -------- */
+  /* -------- 品牌色（跟随主题色切换） -------- */
 
-  static get PRIMARY(): string {
-    return this.isDark() ? '#3B82F6' : '#2F6BFF'
+  static get PRIMARY(): ResourceColor {
+    return AppColor.Brand
   }
 
-  static get CYAN(): string {
-    return this.isDark() ? '#22D3EE' : '#0E9FCC'
+  static get CYAN(): ResourceColor {
+    return AppColor.Brand
   }
 
-  static get MINT(): string {
-    return this.isDark() ? '#34E1B5' : '#0FA98C'
+  static get MINT(): ResourceColor {
+    return AppColor.Brand
   }
 
-  static get VIOLET(): string {
-    return this.isDark() ? '#8B7CF6' : '#7C5CF0'
+  static get VIOLET(): ResourceColor {
+    return AppColor.BrandDark
   }
 
   /* -------- 语义色 -------- */
 
-  static get DANGER(): string {
-    return this.isDark() ? '#F87171' : '#E5484D'
+  static get DANGER(): ResourceColor {
+    return AppColor.Danger
   }
 
-  static get WARN(): string {
-    return this.isDark() ? '#FBBF24' : '#C77700'
+  static get WARN(): ResourceColor {
+    return Theme.isDark() ? '#FBBF24' : '#C77700'
   }
 
-  static get SUCCESS(): string {
-    return this.isDark() ? '#34D399' : '#0A9E6E'
+  static get SUCCESS(): ResourceColor {
+    return Theme.isDark() ? '#34E1B5' : '#0A9E6E'
   }
 
   /* -------- 文字 -------- */
 
-  static get TEXT(): string {
-    return this.isDark() ? '#E8F0FE' : '#17233B'
+  static get TEXT(): ResourceColor {
+    return $r('sys.color.font_primary')
   }
 
-  static get TEXT_SUB(): string {
-    return this.isDark() ? '#93A7C8' : '#54637F'
+  static get TEXT_SUB(): ResourceColor {
+    return $r('sys.color.font_secondary')
   }
 
-  static get TEXT_FAINT(): string {
-    return this.isDark() ? '#5E7599' : '#93A0B8'
+  static get TEXT_FAINT(): ResourceColor {
+    return $r('sys.color.font_tertiary')
   }
 
   /* -------- 边框 / 阴影 / 底栏 -------- */
 
-  static get BORDER(): string {
-    return this.isDark() ? '#1B2C4F' : '#E2E8F3'
+  static get BORDER(): ResourceColor {
+    return AppColor.Divider
   }
 
-  static get BORDER_GLOW(): string {
-    return this.isDark() ? '#2A4A85' : '#C2CFE6'
+  static get BORDER_GLOW(): ResourceColor {
+    return AppColor.Divider
   }
 
-  static get SHADOW(): string {
-    return this.isDark() ? '#40000000' : '#26334D80'
+  static get SHADOW(): ResourceColor {
+    return AppColor.Shadow
   }
 
-  static get TAB_BAR(): string {
-    return this.isDark() ? '#0A1426' : '#FFFFFF'
+  static get TAB_BAR(): ResourceColor {
+    return $r('sys.color.background_primary')
   }
 
-  /* -------- 半透明衍生色（AARRGGBB） -------- */
+  /* -------- 半透明衍生色（仅用于 hex 输入） -------- */
 
   static softOf(hex: string, alpha: string): string {
     if (hex.length === 7 && hex.startsWith('#')) {
@@ -107,45 +111,45 @@ export class Theme {
     return hex
   }
 
-  static get PRIMARY_SOFT(): string {
-    return this.softOf(this.PRIMARY, '44')
+  static get PRIMARY_SOFT(): ResourceColor {
+    return AppColor.BrandSoft
   }
 
-  static get MINT_SOFT(): string {
-    return this.softOf(this.MINT, '22')
+  static get MINT_SOFT(): ResourceColor {
+    return AppColor.BrandSoft
   }
 
   static get DANGER_SOFT(): string {
-    return this.softOf(this.DANGER, '22')
+    return Theme.isDark() ? '#22F87171' : '#22E5484D'
   }
 
-  /* -------- 渐变（仅卡片内部使用，页面背景用纯色避免色差） -------- */
+  /* -------- 渐变（卡片内使用；模板风为纯色填充） -------- */
 
   static get CARD_COLORS(): Array<[ResourceColor, number]> {
     return [
-      [this.CARD_TOP, 0.0],
-      [this.CARD_BOTTOM, 1.0]
+      [$r('sys.color.comp_background_primary'), 0.0],
+      [$r('sys.color.comp_background_primary'), 1.0]
     ]
   }
 
   static get BRAND_COLORS(): Array<[ResourceColor, number]> {
     return [
-      [this.PRIMARY, 0.0],
-      [this.CYAN, 1.0]
+      [AppColor.Brand, 0.0],
+      [AppColor.Brand, 1.0]
     ]
   }
 
   static get MINT_COLORS(): Array<[ResourceColor, number]> {
     return [
-      [this.MINT, 0.0],
-      [this.CYAN, 1.0]
+      [AppColor.Brand, 0.0],
+      [AppColor.Brand, 1.0]
     ]
   }
 
   static get VIOLET_COLORS(): Array<[ResourceColor, number]> {
     return [
-      [this.VIOLET, 0.0],
-      [this.PRIMARY, 1.0]
+      [AppColor.BrandDark, 0.0],
+      [AppColor.Brand, 1.0]
     ]
   }
 

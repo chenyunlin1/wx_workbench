@@ -1,27 +1,27 @@
 import { Fmt, toast } from '../../common/AppKit'
 import { Api } from '../../api/Api'
 import { Theme } from '../../common/Theme'
+import { AppColor, AppFont, AppMaterial, AppRadius, AppSpace } from '../../theme/Theme'
 import { Session } from '../../store/Session'
 import { KnowledgeItem, KnowledgePayload } from '../../model/Models'
-import { Chip, OptionChips, PAGE_PAD_H, PageHeader, SectionTitle, SHEET_PAD_BOTTOM, SHEET_PAD_TOP, SheetHeader, SheetSubmit, TechCard } from '../../components/Ui'
+import { Chip, OptionChips, PAGE_PAD_H, PAGE_SCROLL_BOTTOM, PageHeader, SectionTitle, SHEET_PAD_BOTTOM, SHEET_PAD_TOP, SheetHeader, SheetSubmit, TechCard } from '../../components/Ui'
 
 /**
  * 知识详情页：完整内容 + 已学切换 / 编辑 / 删除。
  * 由备忘 Tab 点击卡片推入，条目 id 通过 AppStorage 的 knowledgeDetailId 传递。
  */
-@Component
+@ComponentV2
 export struct KnowledgeDetailPage {
-  @Consume('nav') nav: NavPathStack
-  @Consume('bottomInset') bottomInset: number
-  @State item: KnowledgeItem | null = null
-  @State loading: boolean = true
-  @State showEdit: boolean = false
-  @State formTypeIndex: number = 0
-  @State formTitle: string = ''
-  @State formTags: string = ''
-  @State formContent: string = ''
-  @State formLearned: boolean = false
-  @State saving: boolean = false
+  @Param nav: NavPathStack = new NavPathStack();
+  @Local item: KnowledgeItem | null = null
+  @Local loading: boolean = true
+  @Local showEdit: boolean = false
+  @Local formTypeIndex: number = 0
+  @Local formTitle: string = ''
+  @Local formTags: string = ''
+  @Local formContent: string = ''
+  @Local formLearned: boolean = false
+  @Local saving: boolean = false
 
   aboutToAppear(): void {
     const id = AppStorage.get<number>('knowledgeDetailId')
@@ -29,7 +29,7 @@ export struct KnowledgeDetailPage {
       this.loading = false
       return
     }
-    Api.knowledgeDetail(id).then((detail) => {
+    Api.knowledgeDetail(id).then((detail: KnowledgeItem) => {
       this.item = detail
     }).catch((err: Object) => {
       toast(err instanceof Error ? err.message : '加载失败')
@@ -38,15 +38,15 @@ export struct KnowledgeDetailPage {
     })
   }
 
-  typeBadge(type: string): string {
+  private typeBadge(type: string): string {
     return type === 'qa' ? '问答' : '笔记'
   }
 
-  toggleLearned(): void {
+  private toggleLearned(): void {
     if (this.item === null) {
       return
     }
-    Api.updateKnowledge(this.item.id, { isLearned: !this.item.isLearned }).then((updated) => {
+    Api.updateKnowledge(this.item.id, { isLearned: !this.item.isLearned }).then((updated: KnowledgeItem) => {
       this.item = updated
       toast(updated.isLearned ? '已标记为已学习' : '已标记为未学习')
       Session.bumpDataVersion()
@@ -55,7 +55,7 @@ export struct KnowledgeDetailPage {
     })
   }
 
-  openEdit(): void {
+  private openEdit(): void {
     if (this.item === null) {
       return
     }
@@ -67,7 +67,7 @@ export struct KnowledgeDetailPage {
     this.showEdit = true
   }
 
-  saveEdit(): void {
+  private saveEdit(): void {
     if (this.item === null) {
       return
     }
@@ -90,7 +90,7 @@ export struct KnowledgeDetailPage {
       isLearned: this.formLearned
     }
     this.saving = true
-    Api.updateKnowledge(this.item.id, payload).then((updated) => {
+    Api.updateKnowledge(this.item.id, payload).then((updated: KnowledgeItem) => {
       this.item = updated
       toast('已保存')
       this.showEdit = false
@@ -102,7 +102,7 @@ export struct KnowledgeDetailPage {
     })
   }
 
-  removeCurrent(): void {
+  private removeCurrent(): void {
     if (this.item === null) {
       return
     }
@@ -116,134 +116,138 @@ export struct KnowledgeDetailPage {
   }
 
   build() {
-    NavDestination() {
-      Stack() {
-        Column() {
-          PageHeader({ title: '知识详情', actionLabel: '编辑', onAction: (): void => {
+    Stack() {
+      Column() {
+        PageHeader({
+          navStack: this.nav,
+          title: '知识详情',
+          actionLabel: '编辑',
+          onAction: (): void => {
             this.openEdit()
-          } })
+          }
+        })
 
-          if (this.loading) {
-            Column({ space: 10 }) {
-              Text('⏳').fontSize(36)
-              Text('加载中…')
-                .fontSize(13)
-                .fontColor(Theme.TEXT_FAINT)
-            }
-            .width('100%')
-            .padding({ top: 80 })
-          } else if (this.item === null) {
-            Column({ space: 10 }) {
-              Text('🗂️').fontSize(36)
-              Text('内容不存在或已被删除')
-                .fontSize(13)
-                .fontColor(Theme.TEXT_FAINT)
-            }
-            .width('100%')
-            .padding({ top: 80 })
-          } else {
-            Scroll() {
-              Column({ space: 12 }) {
-                TechCard() {
-                  Column({ space: 10 }) {
-                    Row({ space: 8 }) {
-                      Chip({
-                        text: this.typeBadge(this.item.type),
-                        color: this.item.type === 'qa' ? Theme.VIOLET : Theme.CYAN
-                      })
-                      Chip({
-                        text: this.item.isLearned ? '已学习' : '未学习',
-                        color: this.item.isLearned ? Theme.MINT : Theme.TEXT_FAINT
-                      })
-                      Blank()
-                      Text('👁 ' + this.item.views)
-                        .fontSize(10)
-                        .fontColor(Theme.TEXT_FAINT)
-                    }
-                    .width('100%')
-                    Text(this.item.title)
-                      .fontSize(19)
-                      .fontWeight(FontWeight.Bold)
-                      .fontColor(Theme.TEXT)
-                      .width('100%')
-                    Row() {
-                      Text('# ' + Fmt.joinTags(this.item.tags))
-                        .fontSize(12)
-                        .fontColor(Theme.VIOLET)
-                        .maxLines(1)
-                        .textOverflow({ overflow: TextOverflow.Ellipsis })
-                        .layoutWeight(1)
-                      Text(Fmt.shortDate(this.item.updatedAt) + ' 更新')
-                        .fontSize(10)
-                        .fontColor(Theme.TEXT_FAINT)
-                    }
-                    .width('100%')
+        if (this.loading) {
+          Column({ space: 10 }) {
+            Text('⏳').fontSize(36)
+            Text('加载中…')
+              .fontSize(13)
+              .fontColor($r('sys.color.font_tertiary'))
+          }
+          .width('100%')
+          .padding({ top: 80 })
+        } else if (this.item === null) {
+          Column({ space: 10 }) {
+            Text('🗂️').fontSize(36)
+            Text('内容不存在或已被删除')
+              .fontSize(13)
+              .fontColor($r('sys.color.font_tertiary'))
+          }
+          .width('100%')
+          .padding({ top: 80 })
+        } else {
+          Scroll() {
+            Column({ space: AppSpace.Sm }) {
+              TechCard() {
+                Column({ space: 10 }) {
+                  Row({ space: AppSpace.Xs }) {
+                    Chip({
+                      text: this.typeBadge(this.item.type),
+                      color: this.item.type === 'qa' ? AppColor.BrandDark : AppColor.Brand
+                    })
+                    Chip({
+                      text: this.item.isLearned ? '已学习' : '未学习',
+                      color: this.item.isLearned ? AppColor.Brand : $r('sys.color.font_tertiary')
+                    })
+                    Blank()
+                    Text('👁 ' + this.item.views)
+                      .fontSize(10)
+                      .fontColor($r('sys.color.font_tertiary'))
                   }
                   .width('100%')
-                }
-
-                TechCard() {
-                  Column({ space: 8 }) {
-                    SectionTitle({ title: '内容' })
-                    Text(this.item.content)
-                      .fontSize(14)
-                      .fontColor(Theme.TEXT_SUB)
-                      .lineHeight(23)
-                      .width('100%')
+                  Text(this.item.title)
+                    .fontSize(19)
+                    .fontWeight(FontWeight.Bold)
+                    .fontColor($r('sys.color.font_primary'))
+                    .width('100%')
+                  Row() {
+                    Text('# ' + Fmt.joinTags(this.item.tags))
+                      .fontSize(AppFont.Caption)
+                      .fontColor(AppColor.BrandDark)
+                      .maxLines(1)
+                      .textOverflow({ overflow: TextOverflow.Ellipsis })
+                      .layoutWeight(1)
+                    Text(Fmt.shortDate(this.item.updatedAt) + ' 更新')
+                      .fontSize(10)
+                      .fontColor($r('sys.color.font_tertiary'))
                   }
                   .width('100%')
-                }
-
-                Row({ space: 10 }) {
-                  Text(this.item.isLearned ? '标记未学' : '标记已学')
-                    .fontSize(13)
-                    .fontColor(Theme.MINT)
-                    .layoutWeight(1)
-                    .textAlign(TextAlign.Center)
-                    .height(42)
-                    .borderRadius(12)
-                    .border({ width: 1, color: Theme.MINT })
-                    .onClick(() => {
-                      this.toggleLearned()
-                    })
-                  Text('删除')
-                    .fontSize(13)
-                    .fontColor(Theme.DANGER)
-                    .layoutWeight(1)
-                    .textAlign(TextAlign.Center)
-                    .height(42)
-                    .borderRadius(12)
-                    .border({ width: 1, color: Theme.DANGER })
-                    .onClick(() => {
-                      this.removeCurrent()
-                    })
                 }
                 .width('100%')
-                .margin({ top: 4, bottom: 12 })
               }
-              .padding({ bottom: this.bottomInset + 16 })
-              .constraintSize({ minHeight: '100%' })
+
+              TechCard() {
+                Column({ space: AppSpace.Xs }) {
+                  SectionTitle({ title: '内容' })
+                  Text(this.item.content)
+                    .fontSize(AppFont.Body)
+                    .fontColor($r('sys.color.font_secondary'))
+                    .lineHeight(23)
+                    .width('100%')
+                }
+                .width('100%')
+              }
+
+              Row({ space: 10 }) {
+                Text(this.item.isLearned ? '标记未学' : '标记已学')
+                  .fontSize(13)
+                  .fontColor(AppColor.Brand)
+                  .layoutWeight(1)
+                  .textAlign(TextAlign.Center)
+                  .height(42)
+                  .borderRadius(AppRadius.Pill)
+                  .border({ width: 1, color: AppColor.Brand })
+                  .onClick(() => {
+                    this.toggleLearned()
+                  })
+                Text('删除')
+                  .fontSize(13)
+                  .fontColor(Theme.DANGER)
+                  .layoutWeight(1)
+                  .textAlign(TextAlign.Center)
+                  .height(42)
+                  .borderRadius(AppRadius.Pill)
+                  .border({ width: 1, color: Theme.DANGER })
+                  .onClick(() => {
+                    this.removeCurrent()
+                  })
+              }
+              .width('100%')
+              .margin({ top: 4, bottom: 12 })
             }
-            .scrollBar(BarState.Off)
-            .width('100%')
-            .height('100%')
+            .padding({ bottom: PAGE_SCROLL_BOTTOM })
+            .constraintSize({ minHeight: '100%' })
           }
+          .scrollBar(BarState.Off)
+          .width('100%')
+          .height('100%')
         }
-        .width('100%')
-        .height('100%')
-        .padding({ left: PAGE_PAD_H, right: PAGE_PAD_H })
       }
       .width('100%')
       .height('100%')
-      .backgroundColor(Theme.BG)
-      .bindSheet($$this.showEdit, this.editSheet(), {
-        height: 640,
-        dragBar: true,
-        backgroundColor: Theme.CARD_SOLID
-      })
+      .padding({ left: PAGE_PAD_H, right: PAGE_PAD_H })
     }
-    .hideTitleBar(true)
-    .backgroundColor(Theme.BG)
+    .width('100%')
+    .height('100%')
+    .backgroundColor($r('sys.color.background_primary'))
+    .bindSheet($$this.showEdit, this.editSheet(), {
+      height: 640,
+      dragBar: true,
+      preferType: SheetType.BOTTOM,
+      backgroundColor: AppMaterial.SheetBackground,
+      blurStyle: AppMaterial.SheetBlur,
+      systemMaterial: AppMaterial.Sheet
+    })
   }
 
   @Builder
@@ -252,7 +256,7 @@ export struct KnowledgeDetailPage {
       Column() {
         SheetHeader({ title: '编辑备忘' })
 
-        Text('类型').fontSize(12).fontColor(Theme.TEXT_SUB).margin({ top: 14, bottom: 6 })
+        Text('类型').fontSize(AppFont.Caption).fontColor($r('sys.color.font_secondary')).margin({ top: 14, bottom: 6 })
         OptionChips({
           options: ['笔记', '问答'],
           selected: this.formTypeIndex,
@@ -261,42 +265,39 @@ export struct KnowledgeDetailPage {
           }
         })
 
-        Text('标题').fontSize(12).fontColor(Theme.TEXT_SUB).margin({ top: 14, bottom: 6 })
+        Text('标题').fontSize(AppFont.Caption).fontColor($r('sys.color.font_secondary')).margin({ top: 14, bottom: 6 })
         TextInput({ placeholder: '备忘标题', text: this.formTitle })
-          .placeholderColor(Theme.TEXT_FAINT)
-          .fontColor(Theme.TEXT)
-          .fontSize(14)
-          .backgroundColor(Theme.INPUT_BG)
-          .borderRadius(10)
-          .border({ width: 1, color: Theme.BORDER })
+          .placeholderColor($r('sys.color.font_tertiary'))
+          .fontColor($r('sys.color.font_primary'))
+          .fontSize(AppFont.Body)
+          .backgroundColor($r('sys.color.comp_background_tertiary'))
+          .borderRadius(AppRadius.Md)
           .height(42)
           .align(Alignment.Start)
           .onChange((value: string) => {
             this.formTitle = value
           })
 
-        Text('标签（逗号分隔）').fontSize(12).fontColor(Theme.TEXT_SUB).margin({ top: 14, bottom: 6 })
+        Text('标签（逗号分隔）').fontSize(AppFont.Caption).fontColor($r('sys.color.font_secondary')).margin({ top: 14, bottom: 6 })
         TextInput({ placeholder: '例如：HarmonyOS, 面试', text: this.formTags })
-          .placeholderColor(Theme.TEXT_FAINT)
-          .fontColor(Theme.TEXT)
-          .fontSize(14)
-          .backgroundColor(Theme.INPUT_BG)
-          .borderRadius(10)
-          .border({ width: 1, color: Theme.BORDER })
+          .placeholderColor($r('sys.color.font_tertiary'))
+          .fontColor($r('sys.color.font_primary'))
+          .fontSize(AppFont.Body)
+          .backgroundColor($r('sys.color.comp_background_tertiary'))
+          .borderRadius(AppRadius.Md)
           .height(42)
           .align(Alignment.Start)
           .onChange((value: string) => {
             this.formTags = value
           })
 
-        Text('内容').fontSize(12).fontColor(Theme.TEXT_SUB).margin({ top: 14, bottom: 6 })
+        Text('内容').fontSize(AppFont.Caption).fontColor($r('sys.color.font_secondary')).margin({ top: 14, bottom: 6 })
         TextArea({ placeholder: '记录知识点…', text: this.formContent })
-          .placeholderColor(Theme.TEXT_FAINT)
-          .fontColor(Theme.TEXT)
-          .fontSize(14)
-          .backgroundColor(Theme.INPUT_BG)
-          .borderRadius(10)
-          .border({ width: 1, color: Theme.BORDER })
+          .placeholderColor($r('sys.color.font_tertiary'))
+          .fontColor($r('sys.color.font_primary'))
+          .fontSize(AppFont.Body)
+          .backgroundColor($r('sys.color.comp_background_tertiary'))
+          .borderRadius(AppRadius.Md)
           .height(170)
           .onChange((value: string) => {
             this.formContent = value
@@ -305,10 +306,10 @@ export struct KnowledgeDetailPage {
         Row({ space: 10 }) {
           Text('标记为已学习')
             .fontSize(13)
-            .fontColor(Theme.TEXT)
+            .fontColor($r('sys.color.font_primary'))
             .layoutWeight(1)
           Toggle({ type: ToggleType.Switch, isOn: this.formLearned })
-            .selectedColor(Theme.MINT)
+            .selectedColor(AppColor.Brand)
             .onChange((isOn: boolean) => {
               this.formLearned = isOn
             })

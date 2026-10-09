@@ -1,12 +1,64 @@
 {
   "color": [
     {
-      "name": "start_window_background",
-      "value": "#F3F6FB"
+      "name": "app_brand",
+      "value": "#C4475B"
     },
     {
-      "name": "theme_probe",
-      "value": "#000001"
+      "name": "app_brand_dark",
+      "value": "#993747"
+    },
+    {
+      "name": "app_brand_disabled",
+      "value": "#66C4475B"
+    },
+    {
+      "name": "app_brand_hover",
+      "value": "#B44154"
+    },
+    {
+      "name": "app_brand_pressed",
+      "value": "#A13A4B"
+    },
+    {
+      "name": "app_brand_soft",
+      "value": "#22C4475B"
+    },
+    {
+      "name": "app_divider",
+      "value": "#1F000000"
+    },
+    {
+      "name": "app_on_brand",
+      "value": "#FFFFFF"
+    },
+    {
+      "name": "app_shadow",
+      "value": "#1A000000"
+    },
+    {
+      "name": "floating_bar_mask",
+      "value": "#66F1F3F5"
+    },
+    {
+      "name": "glass_control_fallback",
+      "value": "#E6FFFFFF"
+    },
+    {
+      "name": "home_bg_neutral",
+      "value": "#F5F5F5"
+    },
+    {
+      "name": "home_bg_warm_mid",
+      "value": "#F5F5F5"
+    },
+    {
+      "name": "home_bg_warm_top",
+      "value": "#F5F5F5"
+    },
+    {
+      "name": "start_window_background",
+      "value": "#FFFFFF"
     }
   ]
 }

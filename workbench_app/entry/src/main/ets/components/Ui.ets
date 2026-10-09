@@ -1,4 +1,6 @@
 import { Theme } from '../common/Theme'
+import { AppColor, AppFont, AppRadius, AppSpace, HomeTheme } from '../theme/Theme'
+import { WindowUtils } from '../utils/WindowUtils'
 
 /**
  * 二级页面（NavDestination）统一的左右内边距。
@@ -17,17 +19,17 @@ export const SHEET_PAD_TOP: number = 20
 export const SHEET_PAD_BOTTOM: number = 18
 
 /**
- * 科技风卡片容器：整卡点击走 onCard，不要在外层容器上挂 onClick（会被本组件的手势吃掉）。
+ * 卡片容器：模板风纯色卡（comp_background_primary + 大圆角），整卡点击走 onCard。
  * clip 是按圆角裁的，paddingV 为 0 的整幅封面才不会把直角戳出卡片外。
  */
-@Component
+@ComponentV2
 export struct TechCard {
   @BuilderParam content: () => void
-  @Prop paddingV: number = 14
-  @Prop radius: number = 18
-  @Prop mt: number = 0
-  @Prop mb: number = 0
-  onCard: () => void = () => {
+  @Param paddingV: number = 16
+  @Param radius: number = AppRadius.Lg
+  @Param mt: number = 0
+  @Param mb: number = 0
+  @Event onCard: () => void = () => {
   }
 
   build() {
@@ -38,11 +40,7 @@ export struct TechCard {
     .padding(this.paddingV)
     .borderRadius(this.radius)
     .clip(true)
-    .linearGradient({
-      angle: 180,
-      colors: Theme.CARD_COLORS
-    })
-    .border({ width: 1, color: Theme.BORDER })
+    .backgroundColor($r('sys.color.comp_background_primary'))
     .margin({ top: this.mt, bottom: this.mb })
     .onClick(() => {
       this.onCard()
@@ -51,49 +49,48 @@ export struct TechCard {
 }
 
 /** 区块标题 */
-@Component
+@ComponentV2
 export struct SectionTitle {
-  @Prop title: string = ''
-  @Prop accent: ResourceColor = Theme.CYAN
+  @Param title: string = ''
+  @Param accent: ResourceColor = AppColor.Brand
 
   build() {
-    Row({ space: 8 }) {
+    Row({ space: AppSpace.Xs }) {
       Column()
-        .width(4)
-        .height(16)
+        .width(3)
+        .height(14)
         .borderRadius(2)
         .backgroundColor(this.accent)
-        .shadow({ radius: 6, color: '#6622D3EE', offsetY: 0 })
       Text(this.title)
-        .fontSize(16)
+        .fontSize(AppFont.BodyL)
         .fontWeight(FontWeight.Bold)
-        .fontColor(Theme.TEXT)
+        .fontColor($r('sys.color.font_primary'))
       Blank()
     }
     .width('100%')
-    .margin({ bottom: 10 })
+    .margin({ bottom: AppSpace.Xs })
   }
 }
 
 /** 小号胶囊按钮：半弹窗标题栏与行内并列操作共用，等高 + 同最小宽度，两个并排时宽度一致 */
-@Component
+@ComponentV2
 export struct PillButton {
-  @Prop label: string = ''
-  @Prop filled: boolean = true
-  onTap: () => void = () => {
+  @Param label: string = ''
+  @Param filled: boolean = true
+  @Event onTap: () => void = () => {
   }
 
   build() {
     Text(this.label)
-      .fontSize(13)
-      .fontColor(this.filled ? '#FFFFFF' : Theme.TEXT_SUB)
+      .fontSize(AppFont.Caption + 1)
+      .fontWeight(FontWeight.Medium)
+      .fontColor(this.filled ? AppColor.OnBrand : $r('sys.color.font_secondary'))
       .textAlign(TextAlign.Center)
       .height(32)
       .constraintSize({ minWidth: 64 })
-      .padding({ left: 12, right: 12 })
-      .borderRadius(10)
-      .backgroundColor(this.filled ? Theme.PRIMARY : Theme.INPUT_BG)
-      .border({ width: 1, color: this.filled ? Theme.PRIMARY : Theme.BORDER })
+      .padding({ left: AppSpace.Sm, right: AppSpace.Sm })
+      .borderRadius(AppRadius.Pill)
+      .backgroundColor(this.filled ? AppColor.Brand : $r('sys.color.comp_background_tertiary'))
       .onClick(() => {
         this.onTap()
       })
@@ -104,22 +101,22 @@ export struct PillButton {
  * 半弹窗标题栏：标题左对齐，右侧最多两个并等操作（次要在左、主要右）。
  * 整行垂直居中，所以标题不会被右侧按钮的高度拽偏。
  */
-@Component
+@ComponentV2
 export struct SheetHeader {
-  @Prop title: string = ''
-  @Prop actionLabel: string = ''
-  @Prop actionLabel2: string = ''
-  onAction: () => void = () => {
+  @Param title: string = ''
+  @Param actionLabel: string = ''
+  @Param actionLabel2: string = ''
+  @Event onAction: () => void = () => {
   }
-  onAction2: () => void = () => {
+  @Event onAction2: () => void = () => {
   }
 
   build() {
-    Row({ space: 8 }) {
+    Row({ space: AppSpace.Xs }) {
       Text(this.title)
-        .fontSize(17)
+        .fontSize(AppFont.BodyL)
         .fontWeight(FontWeight.Bold)
-        .fontColor(Theme.TEXT)
+        .fontColor($r('sys.color.font_primary'))
         .maxLines(1)
         .textOverflow({ overflow: TextOverflow.Ellipsis })
         .layoutWeight(1)
@@ -147,26 +144,26 @@ export struct SheetHeader {
   }
 }
 
-/** 半弹窗主提交按钮：整宽渐变，busy 时降透明度并吞掉点击 */
-@Component
+/** 半弹窗主提交按钮：整宽品牌色胶囊，busy 时降透明度并吞掉点击 */
+@ComponentV2
 export struct SheetSubmit {
-  @Prop label: string = '保 存'
-  @Prop busy: boolean = false
-  onSubmit: () => void = () => {
+  @Param label: string = '保 存'
+  @Param busy: boolean = false
+  @Event onSubmit: () => void = () => {
   }
 
   build() {
     Text(this.label)
-      .fontSize(15)
-      .fontWeight(FontWeight.Bold)
-      .fontColor('#FFFFFF')
+      .fontSize(AppFont.BodyL)
+      .fontWeight(FontWeight.Medium)
+      .fontColor(AppColor.OnBrand)
       .textAlign(TextAlign.Center)
       .width('100%')
       .height(46)
-      .borderRadius(12)
-      .linearGradient({ angle: 135, colors: Theme.BRAND_COLORS })
+      .borderRadius(AppRadius.Pill)
+      .backgroundColor(AppColor.Brand)
       .opacity(this.busy ? 0.6 : 1)
-      .margin({ top: 20 })
+      .margin({ top: AppSpace.Md })
       .onClick(() => {
         if (!this.busy) {
           this.onSubmit()
@@ -176,21 +173,21 @@ export struct SheetSubmit {
 }
 
 /** 半弹窗删除入口：整宽，紧跟在主按钮之后 */
-@Component
+@ComponentV2
 export struct SheetDelete {
-  @Prop label: string = '删除'
-  @Prop busy: boolean = false
-  onDelete: () => void = () => {
+  @Param label: string = '删除'
+  @Param busy: boolean = false
+  @Event onDelete: () => void = () => {
   }
 
   build() {
     Text(this.label)
-      .fontSize(13)
+      .fontSize(AppFont.Caption + 1)
       .fontColor(Theme.DANGER)
       .textAlign(TextAlign.Center)
       .width('100%')
       .height(44)
-      .margin({ top: 4 })
+      .margin({ top: AppSpace.Xxs })
       .onClick(() => {
         if (!this.busy) {
           this.onDelete()
@@ -199,37 +196,56 @@ export struct SheetDelete {
   }
 }
 
-/** 圆角小标签 */
-@Component
-export struct Chip {  @Prop text: string = ''
-  @Prop color: string = Theme.CYAN
-  @Prop selected: boolean = false
-  @Prop small: boolean = false
+/** 圆角小标签：色值接受 hex 字符串或资源色，选中态实心填充 */
+@ComponentV2
+export struct Chip {
+  @Param text: string = ''
+  @Param color: ResourceColor = AppColor.Brand
+  @Param selected: boolean = false
+  @Param small: boolean = false
+
+  private softFill(): ResourceColor {
+    const c: ResourceColor = this.color
+    if (typeof c === 'string' && c.length === 7 && c.startsWith('#')) {
+      return Theme.softOf(c, '22')
+    }
+    return $r('sys.color.comp_background_tertiary')
+  }
+
+  private softStroke(): ResourceColor {
+    const c: ResourceColor = this.color
+    if (typeof c === 'string' && c.length === 7 && c.startsWith('#')) {
+      return Theme.softOf(c, '55')
+    }
+    return Color.Transparent
+  }
 
   build() {
     Text(this.text)
-      .fontSize(this.small ? 11 : 12)
+      .fontSize(this.small ? 11 : AppFont.Caption)
       .fontColor(this.selected ? '#FFFFFF' : this.color)
-      .padding({ left: this.small ? 8 : 10, right: this.small ? 8 : 10, top: this.small ? 3 : 5, bottom: this.small ? 3 : 5 })
-      .borderRadius(999)
-      .backgroundColor(this.selected ? this.color : Theme.softOf(this.color, '22'))
-      .border({
-        width: 1,
-        color: this.selected ? this.color : Theme.softOf(this.color, '55')
+      .padding({
+        left: this.small ? AppSpace.Xs : 10,
+        right: this.small ? AppSpace.Xs : 10,
+        top: this.small ? 3 : 5,
+        bottom: this.small ? 3 : 5
       })
+      .borderRadius(AppRadius.Pill)
+      .backgroundColor(this.selected ? this.color : this.softFill())
+      .border({ width: 1, color: this.selected ? this.color : this.softStroke() })
   }
 }
 
 /** 可选中的横向筛选 chips */
-@Component
+@ComponentV2
 export struct OptionChips {
-  @Prop options: string[] = []
-  @Prop labels: string[] = []
-  @Prop selected: number = 0
-  onSelect: (index: number) => void = () => {
+  @Param options: string[] = []
+  @Param labels: string[] = []
+  @Param selected: number = 0
+  @Event onSelect: (index: number) => void = () => {
   }
 
-  labelOf(index: number): string {
+  private labelOf(index: number): string {
     if (this.labels.length > index) {
       return this.labels[index]
     }
@@ -238,7 +254,7 @@ export struct OptionChips {
 
   build() {
     Scroll() {
-      Row({ space: 8 }) {
+      Row({ space: AppSpace.Xs }) {
         ForEach(this.options, (option: string, index: number) => {
           Chip({
             text: this.labelOf(index),
@@ -257,36 +273,35 @@ export struct OptionChips {
 }
 
 /** 统计块（首页/概览用） */
-@Component
+@ComponentV2
 export struct StatTile {
-  @Prop icon: string = ''
-  @Prop value: string = ''
-  @Prop label: string = ''
-  @Prop accent: string = Theme.CYAN
-  @Prop weighted: boolean = false
-  onTile: () => void = () => {
+  @Param icon: string = ''
+  @Param value: string = ''
+  @Param label: string = ''
+  @Param accent: ResourceColor = AppColor.Brand
+  @Param weighted: boolean = false
+  @Event onTile: () => void = () => {
   }
 
   build() {
     Column({ space: 6 }) {
       Text(this.icon)
-        .fontSize(18)
+        .fontSize(AppFont.Title)
       Text(this.value)
-        .fontSize(18)
+        .fontSize(AppFont.Title)
         .fontWeight(FontWeight.Bold)
         .fontColor(this.accent)
         .maxLines(1)
         .textOverflow({ overflow: TextOverflow.Ellipsis })
       Text(this.label)
         .fontSize(11)
-        .fontColor(Theme.TEXT_SUB)
+        .fontColor($r('sys.color.font_secondary'))
         .maxLines(1)
     }
     .width('100%')
-    .padding({ top: 12, bottom: 12, left: 6, right: 6 })
-    .borderRadius(14)
-    .backgroundColor(Theme.CARD_SOLID)
-    .border({ width: 1, color: Theme.BORDER })
+    .padding({ top: AppSpace.Sm, bottom: AppSpace.Sm, left: 6, right: 6 })
+    .borderRadius(AppRadius.Md)
+    .backgroundColor($r('sys.color.comp_background_primary'))
     .alignItems(HorizontalAlign.Center)
     .layoutWeight(this.weighted ? 1 : 0)
     .onClick(() => {
@@ -296,19 +311,19 @@ export struct StatTile {
 }
 
 /** 空状态 */
-@Component
+@ComponentV2
 export struct EmptyView {
-  @Prop icon: string = '🛰️'
-  @Prop text: string = '这里空空如也'
+  @Param icon: string = '🛰️'
+  @Param text: string = '这里空空如也'
 
   build() {
-    Column({ space: 10 }) {
+    Column({ space: AppSpace.Xs }) {
       Text(this.icon)
         .fontSize(40)
         .opacity(0.8)
       Text(this.text)
-        .fontSize(13)
-        .fontColor(Theme.TEXT_FAINT)
+        .fontSize(AppFont.Caption + 1)
+        .fontColor($r('sys.color.font_tertiary'))
     }
     .width('100%')
     .padding({ top: 36, bottom: 36 })
@@ -317,44 +332,37 @@ export struct EmptyView {
 }
 
 /** 功能页页头：返回 + 标题 + 右侧动作（顶部预留状态栏高度） */
-@Component
+@ComponentV2
 export struct PageHeader {
-  @Consume('nav') nav: NavPathStack
-  @Consume('topInset') topInset: number
-  @Prop title: string = ''
-  @Prop actionLabel: string = ''
-  onAction: () => void = () => {
+  @Param navStack: NavPathStack = new NavPathStack()
+  @Param title: string = ''
+  @Param actionLabel: string = ''
+  @Event onAction: () => void = () => {
   }
 
   build() {
-    Row({ space: 12 }) {
-      Text('‹')
-        .fontSize(26)
-        .fontWeight(FontWeight.Bold)
-        .fontColor(Theme.TEXT)
-        .width(36)
-        .height(36)
-        .textAlign(TextAlign.Center)
-        .borderRadius(12)
-        .backgroundColor(Theme.CARD_SOLID)
-        .border({ width: 1, color: Theme.BORDER })
+    Row({ space: AppSpace.Xs }) {
+      SymbolGlyph($r('sys.symbol.chevron_left'))
+        .fontSize(24)
+        .fontColor([$r('sys.color.font_primary')])
         .onClick(() => {
-          this.nav.pop()
+          this.navStack.pop()
         })
       Text(this.title)
-        .fontSize(18)
+        .fontSize(AppFont.Title)
         .fontWeight(FontWeight.Bold)
-        .fontColor(Theme.TEXT)
+        .fontColor($r('sys.color.font_primary'))
         .layoutWeight(1)
         .maxLines(1)
         .textOverflow({ overflow: TextOverflow.Ellipsis })
       if (this.actionLabel.length > 0) {
         Text(this.actionLabel)
-          .fontSize(13)
-          .fontColor('#FFFFFF')
-          .padding({ left: 12, right: 12, top: 7, bottom: 7 })
-          .borderRadius(12)
-          .linearGradient({ angle: 135, colors: Theme.BRAND_COLORS })
+          .fontSize(AppFont.Caption + 1)
+          .fontWeight(FontWeight.Medium)
+          .fontColor(AppColor.OnBrand)
+          .padding({ left: AppSpace.Sm, right: AppSpace.Sm, top: 7, bottom: 7 })
+          .borderRadius(AppRadius.Pill)
+          .backgroundColor(AppColor.Brand)
           .onClick(() => {
             this.onAction()
           })
@@ -362,21 +370,15 @@ export struct PageHeader {
     }
     .width('100%')
     .height(52)
-    .margin({ top: this.topInset })
+    .margin({ top: WindowUtils.getStatusBarHeightVp() })
   }
 }
 
 /** 只读星级 */
-@Component
+@ComponentV2
 export struct Stars {
-  @Prop rating: number = 0
-  @Prop starSize: number = 12
-
-  build() {
-    Text(this.rating > 0 ? this.repeatStars() : '未评分')
-      .fontSize(this.starSize)
-      .fontColor(this.rating > 0 ? Theme.WARN : Theme.TEXT_FAINT)
-  }
+  @Param rating: number = 0
+  @Param starSize: number = 12
 
   private repeatStars(): string {
     let stars: string = ''
@@ -386,13 +388,19 @@ export struct Stars {
     }
     return stars
   }
+
+  build() {
+    Text(this.rating > 0 ? this.repeatStars() : '未评分')
+      .fontSize(this.starSize)
+      .fontColor(this.rating > 0 ? Theme.WARN : $r('sys.color.font_tertiary'))
+  }
 }
 
 /** 星级选择（编辑表单用） */
-@Component
+@ComponentV2
 export struct StarPicker {
-  @Prop value: number = 0
-  onChange: (value: number) => void = () => {
+  @Param value: number = 0
+  @Event onChange: (value: number) => void = () => {
   }
 
   build() {
@@ -400,15 +408,15 @@ export struct StarPicker {
       ForEach([1, 2, 3, 4, 5], (n: number) => {
         Text(n <= this.value ? '★' : '☆')
           .fontSize(26)
-          .fontColor(n <= this.value ? Theme.WARN : Theme.TEXT_FAINT)
+          .fontColor(n <= this.value ? Theme.WARN : $r('sys.color.font_tertiary'))
           .onClick(() => {
             this.onChange(n)
           })
       }, (n: number) => n.toString() + this.value.toString())
       if (this.value > 0) {
         Text('清除')
-          .fontSize(12)
-          .fontColor(Theme.TEXT_FAINT)
+          .fontSize(AppFont.Caption)
+          .fontColor($r('sys.color.font_tertiary'))
           .onClick(() => {
             this.onChange(0)
           })
@@ -418,10 +426,10 @@ export struct StarPicker {
 }
 
 /** 迷你横向进度条 */
-@Component
+@ComponentV2
 export struct MiniBar {
-  @Prop ratio: number = 0
-  @Prop color: string = Theme.CYAN
+  @Param ratio: number = 0
+  @Param color: ResourceColor = AppColor.Brand
 
   build() {
     Stack({ alignContent: Alignment.Start }) {
@@ -429,12 +437,12 @@ export struct MiniBar {
         .width('100%')
         .height(6)
         .borderRadius(3)
-        .backgroundColor(Theme.BORDER)
+        .backgroundColor($r('sys.color.comp_background_tertiary'))
       Column()
         .width(this.ratio * 100 + '%')
         .height(6)
         .borderRadius(3)
-        .linearGradient({ angle: 90, colors: Theme.MINT_COLORS })
+        .backgroundColor(this.color)
     }
     .width('100%')
     .height(6)
@@ -442,25 +450,28 @@ export struct MiniBar {
 }
 
 /** 表单输入行 */
-@Component
+@ComponentV2
 export struct FieldLabel {
-  @Prop label: string = ''
+  @Param label: string = ''
 
   build() {
     Text(this.label)
-      .fontSize(12)
-      .fontColor(Theme.TEXT_SUB)
-      .margin({ top: 12, bottom: 6 })
+      .fontSize(AppFont.Caption)
+      .fontColor($r('sys.color.font_secondary'))
+      .margin({ top: AppSpace.Sm, bottom: 6 })
   }
 }
 
-/** 页面背景（纯色，与状态栏/导航条区域无缝衔接） */
-@Component
+/** 页面背景（暖色渐变，与模板首页/我的页一致，随深浅色自动切换） */
+@ComponentV2
 export struct TechBackground {
   build() {
     Column()
       .width('100%')
       .height('100%')
-      .backgroundColor(Theme.BG)
+      .linearGradient({
+        angle: 180,
+        colors: [[HomeTheme.BgWarmTop, 0.0], [HomeTheme.BgWarmMid, 0.45], [HomeTheme.BgNeutral, 1.0]]
+      })
   }
 }

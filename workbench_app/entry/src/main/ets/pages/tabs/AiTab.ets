@@ -3,6 +3,8 @@ import { Options } from '../../common/AppKit'
 import { Api } from '../../api/Api'
 import { SseStream } from '../../common/Http'
 import { Theme } from '../../common/Theme'
+import { AppColor, AppFont, AppMaterial, AppRadius, AppSpace } from '../../theme/Theme'
+import { WindowUtils } from '../../utils/WindowUtils'
 import { Session } from '../../store/Session'
 import { common } from '@kit.AbilityKit'
 import { KeyboardAvoidMode } from '@kit.ArkUI'
@@ -63,35 +65,35 @@ function toChatActions(list: AiAction[] | null | undefined): ChatAction[] {
   return result
 }
 
-@Component
+@ComponentV2
 export struct AiTab {
-  @Consume('topInset') topInset: number
+  @Event onScrollerReady: (scroller: Scroller) => void = () => {};
   private scroller: Scroller = new Scroller()
-  @State messages: ChatMsg[] = []
-  @State input: string = ''
-  @State sending: boolean = false
-  @State conversationId: number = 0
-  @State conversations: AiConversationSummary[] = []
-  @State showConv: boolean = false
-  @State showSettings: boolean = false
-  @State renamingId: number = 0
-  @State renameText: string = ''
-  @State currentModel: string = ''
+  @Local messages: ChatMsg[] = []
+  @Local input: string = ''
+  @Local sending: boolean = false
+  @Local conversationId: number = 0
+  @Local conversations: AiConversationSummary[] = []
+  @Local showConv: boolean = false
+  @Local showSettings: boolean = false
+  @Local renamingId: number = 0
+  @Local renameText: string = ''
+  @Local currentModel: string = ''
   // 设置表单
-  @State settingsLoaded: boolean = false
-  @State apiKey: string = ''
-  @State baseUrl: string = 'https://api.deepseek.com'
-  @State modelIndex: number = 0
-  @State temperature: number = 0.7
-  @State systemPrompt: string = ''
-  @State scopeSelected: boolean[] = [true, true, true, true, true, true, true, true, true, true]
-  @State hasKey: boolean = false
-  @State keyPreview: string = ''
-  @State savingSettings: boolean = false
-  @State testMessage: string = ''
-  @State busyAction: boolean = false
-  @State voiceOn: boolean = false
-  @State voicePending: boolean = false
+  @Local settingsLoaded: boolean = false
+  @Local apiKey: string = ''
+  @Local baseUrl: string = 'https://api.deepseek.com'
+  @Local modelIndex: number = 0
+  @Local temperature: number = 0.7
+  @Local systemPrompt: string = ''
+  @Local scopeSelected: boolean[] = [true, true, true, true, true, true, true, true, true, true]
+  @Local hasKey: boolean = false
+  @Local keyPreview: string = ''
+  @Local savingSettings: boolean = false
+  @Local testMessage: string = ''
+  @Local busyAction: boolean = false
+  @Local voiceOn: boolean = false
+  @Local voicePending: boolean = false
   private speech: SpeechInput = new SpeechInput()
   private inputController: TextAreaController = new TextAreaController()
   private stream: SseStream | undefined = undefined
@@ -100,6 +102,7 @@ export struct AiTab {
   private voiceActive: boolean = false
 
   aboutToAppear(): void {
+    this.onScrollerReady(this.scroller)
     this.loadConversations()
   }
 
@@ -116,14 +119,14 @@ export struct AiTab {
     }
   }
 
-  loadConversations(): void {
-    Api.listAiConversations().then((list) => {
+  private loadConversations(): void {
+    Api.listAiConversations().then((list: AiConversationSummary[]) => {
       this.conversations = list
     }).catch(() => {
     })
   }
 
-  loadSettings(): void {
+  private loadSettings(): void {
     Api.aiSettings().then((settings) => {
       this.baseUrl = settings.baseUrl
       this.modelIndex = settings.model === 'deepseek-reasoner' ? 1 : 0
@@ -143,12 +146,12 @@ export struct AiTab {
     })
   }
 
-  openConversations(): void {
+  private openConversations(): void {
     this.renamingId = 0
     this.showConv = true
   }
 
-  openSettings(): void {
+  private openSettings(): void {
     this.testMessage = ''
     this.showSettings = true
     if (!this.settingsLoaded) {
@@ -156,13 +159,13 @@ export struct AiTab {
     }
   }
 
-  newConversation(): void {
+  private newConversation(): void {
     this.conversationId = 0
     this.messages = []
     this.showConv = false
   }
 
-  openConversation(item: AiConversationSummary): void {
+  private openConversation(item: AiConversationSummary): void {
     if (this.sending) {
       toast('请等待当前回复完成')
       return
@@ -187,7 +190,7 @@ export struct AiTab {
     })
   }
 
-  removeConversation(id: number): void {
+  private removeConversation(id: number): void {
     Api.deleteAiConversation(id).then(() => {
       toast('会话已删除')
       if (id === this.conversationId) {
@@ -199,7 +202,7 @@ export struct AiTab {
     })
   }
 
-  saveRename(): void {
+  private saveRename(): void {
     if (this.renameText.trim().length === 0) {
       toast('标题不能为空')
       return
@@ -212,7 +215,7 @@ export struct AiTab {
     })
   }
 
-  scrollToBottom(): void {
+  private scrollToBottom(): void {
     setTimeout(() => {
       this.scroller.scrollEdge(Edge.Bottom)
     }, 120)
@@ -223,11 +226,11 @@ export struct AiTab {
    * RESIZE 改成压缩页面高度，标题栏不动、消息区变矮，输入区正好贴在键盘上。
    * 只在输入框持有焦点期间生效，避免影响其他页面的输入框。
    */
-  useResizeAvoidance(resize: boolean): void {
+  private useResizeAvoidance(resize: boolean): void {
     this.getUIContext().setKeyboardAvoidMode(resize ? KeyboardAvoidMode.RESIZE : KeyboardAvoidMode.OFFSET)
   }
 
-  send(): void {
+  private send(): void {
     if (this.voiceOn) {
       this.stopVoice()
       return
@@ -292,7 +295,7 @@ export struct AiTab {
    * delta 基本一个字一帧，逐帧刷新会让整条气泡连 markdown 一起重排；
    * 按约 10fps 合并成一次，看起来就是打字机，也不会把 UI 线程占满。
    */
-  scheduleStreamFlush(msg: ChatMsg): void {
+  private scheduleStreamFlush(msg: ChatMsg): void {
     if (this.flushTimer >= 0) {
       return
     }
@@ -304,7 +307,7 @@ export struct AiTab {
     }, 90)
   }
 
-  stopStreamFlush(): void {
+  private stopStreamFlush(): void {
     if (this.flushTimer >= 0) {
       clearTimeout(this.flushTimer)
       this.flushTimer = -1
@@ -315,7 +318,7 @@ export struct AiTab {
    * 识别结果是整段覆盖式的，所以只保留本次录音开始前的内容，
    * 之后的文字每次用最新结果替换；再说一次会覆盖同一截。
    */
-  startVoice(): void {
+  private startVoice(): void {
     if (this.voiceOn || this.voicePending || this.sending) {
       return
     }
@@ -355,7 +358,7 @@ export struct AiTab {
     })
   }
 
-  stopVoice(): void {
+  private stopVoice(): void {
     if (!this.voiceOn) {
       return
     }
@@ -371,7 +374,7 @@ export struct AiTab {
     }, 4000)
   }
 
-  bubbleText(msg: ChatMsg): string {
+  private bubbleText(msg: ChatMsg): string {
     if (msg.content.length === 0) {
       if (msg.pending) {
         return '正在思考…'
@@ -384,11 +387,11 @@ export struct AiTab {
   }
 
   /** AI 回复按 markdown 排版，用户自己说的话保持原样 */
-  mdSpans(msg: ChatMsg): MdSpan[] {
+  private mdSpans(msg: ChatMsg): MdSpan[] {
     return parseMarkdown(this.bubbleText(msg), 14)
   }
 
-  actionStateColor(status: string): string {
+  private actionStateColor(status: string): ResourceColor {
     if (status === 'done') {
       return Theme.SUCCESS
     }
@@ -396,12 +399,12 @@ export struct AiTab {
       return Theme.DANGER
     }
     if (status === 'cancelled') {
-      return Theme.TEXT_FAINT
+      return $r('sys.color.font_tertiary')
     }
     return Theme.WARN
   }
 
-  reportAction(msg: ChatMsg, index: number, status: string, error: string): void {
+  private reportAction(msg: ChatMsg, index: number, status: string, error: string): void {
     if (msg.dbId <= 0) {
       return
     }
@@ -410,7 +413,7 @@ export struct AiTab {
   }
 
   /** 卡片上的确认：用 app 自己的创建接口写库，再把结果回传给后端 */
-  applyAction(msg: ChatMsg, index: number, approve: boolean): void {
+  private applyAction(msg: ChatMsg, index: number, approve: boolean): void {
     const action = msg.actions[index]
     if (action === undefined || action.status !== 'pending' || this.busyAction) {
       return
@@ -422,7 +425,7 @@ export struct AiTab {
       return
     }
     this.busyAction = true
-    runAiAction(action.tool, action.args).then((tip) => {
+    runAiAction(action.tool, action.args).then((tip: string) => {
       action.status = 'done'
       action.error = ''
       toast(tip)
@@ -440,12 +443,12 @@ export struct AiTab {
     })
   }
 
-  refreshAction(msg: ChatMsg): void {
+  private refreshAction(msg: ChatMsg): void {
     msg.rev += 1
     this.messages = this.messages.slice()
   }
 
-  saveSettings(): void {
+  private saveSettings(): void {
     const scope: string[] = []
     for (let i = 0; i < SCOPE_KEYS.length; i++) {
       if (this.scopeSelected[i]) {
@@ -474,7 +477,7 @@ export struct AiTab {
     })
   }
 
-  testConnection(): void {
+  private testConnection(): void {
     this.testMessage = '测试中…'
     const payload: AiSettingsPayload = {
       baseUrl: this.baseUrl.trim(),
@@ -492,7 +495,7 @@ export struct AiTab {
     })
   }
 
-  clearKey(): void {
+  private clearKey(): void {
     Api.clearAiKey().then(() => {
       toast('已清除保存的密钥')
       this.apiKey = ''
@@ -511,8 +514,8 @@ export struct AiTab {
       Column() {
         if (msg.role === 'user') {
           Text(this.bubbleText(msg))
-            .fontSize(14)
-            .fontColor('#FFFFFF')
+            .fontSize(AppFont.Body)
+            .fontColor(AppColor.OnBrand)
             .lineHeight(21)
         } else {
           // SDK 没有内置 Markdown 组件，只能把语法拆成 Span 交给 Text 排版
@@ -521,33 +524,33 @@ export struct AiTab {
               Span(span.text)
                 .fontSize(span.size)
                 .fontWeight(span.bold ? FontWeight.Bold : FontWeight.Normal)
-                .fontColor(span.color.length > 0 ? span.color : Theme.TEXT)
+                .fontColor(span.color.length > 0 ? span.color : $r('sys.color.font_primary'))
                 .fontFamily(span.code ? 'monospace,HarmonyOS Sans' : 'HarmonyOS Sans')
                 .textBackgroundStyle({
-                  color: span.code ? Theme.softOf(Theme.PRIMARY, '22') : Color.Transparent,
+                  color: span.code ? AppColor.BrandSoft : Color.Transparent,
                   radius: 4
                 })
             }, (span: MdSpan, index: number) => index.toString() + '-' + span.text)
           }
-          .fontSize(14)
-          .fontColor(Theme.TEXT)
+          .fontSize(AppFont.Body)
+          .fontColor($r('sys.color.font_primary'))
           .width('100%')
         }
         if (msg.error.length > 0) {
           Text('⚠ ' + msg.error)
-            .fontSize(12)
+            .fontSize(AppFont.Caption)
             .fontColor(Theme.DANGER)
             .margin({ top: 6 })
         }
         if (msg.role !== 'user' && msg.actions.length > 0) {
-          Column({ space: 8 }) {
+          Column({ space: AppSpace.Xs }) {
             ForEach(msg.actions, (action: ChatAction, index: number) => {
               Column({ space: 5 }) {
-                Row({ space: 8 }) {
+                Row({ space: AppSpace.Xs }) {
                   Text(action.label)
-                    .fontSize(12)
+                    .fontSize(AppFont.Caption)
                     .fontWeight(FontWeight.Bold)
-                    .fontColor(Theme.TEXT)
+                    .fontColor($r('sys.color.font_primary'))
                     .layoutWeight(1)
                   Text(actionStateLabel(action.status))
                     .fontSize(11)
@@ -557,7 +560,7 @@ export struct AiTab {
                 ForEach(action.fields, (field: AiActionField) => {
                   Text(field.label + '：' + field.value)
                     .fontSize(11)
-                    .fontColor(Theme.TEXT_SUB)
+                    .fontColor($r('sys.color.font_secondary'))
                     .width('100%')
                 }, (field: AiActionField) => field.label)
                 if (action.error.length > 0) {
@@ -567,7 +570,7 @@ export struct AiTab {
                     .width('100%')
                 }
                 if (action.status === 'pending') {
-                  Row({ space: 8 }) {
+                  Row({ space: AppSpace.Xs }) {
                     PillButton({
                       label: '取消',
                       filled: false,
@@ -591,9 +594,8 @@ export struct AiTab {
               .alignItems(HorizontalAlign.Start)
               .width('100%')
               .padding(10)
-              .borderRadius(12)
-              .backgroundColor(Theme.INPUT_BG)
-              .border({ width: 1, color: Theme.BORDER })
+              .borderRadius(AppRadius.Md)
+              .backgroundColor($r('sys.color.comp_background_tertiary'))
             }, (action: ChatAction, index: number) => index.toString() + '-' + action.status + '-' + action.error)
           }
           .width('100%')
@@ -606,72 +608,71 @@ export struct AiTab {
         maxWidth: msg.role === 'user' ? '78%' : '100%',
         minWidth: msg.role === 'user' ? 0 : '100%'
       })
-      .padding(12)
-      .borderRadius(16)
-      .linearGradient({
-        angle: 135,
-        colors: msg.role === 'user' ? Theme.BRAND_COLORS : Theme.CARD_COLORS
-      })
-      .border({ width: 1, color: msg.role === 'user' ? '#3B82F6' : Theme.BORDER })
+      .padding({ left: AppSpace.Sm, right: AppSpace.Sm, top: 10, bottom: 10 })
+      .borderRadius(AppRadius.Lg)
+      .backgroundColor(msg.role === 'user' ? AppColor.Brand : $r('sys.color.comp_background_primary'))
       if (msg.role !== 'user') {
         Blank()
       }
     }
     .width('100%')
-    .margin({ bottom: 10 })
+    .margin({ bottom: AppSpace.Xs })
   }
 
   build() {
     Stack() {
       Column() {
         // 顶部栏
-        Row({ space: 10 }) {
+        Row({ space: AppSpace.Sm }) {
           Column({ space: 2 }) {
             Text('AI 助手')
-              .fontSize(20)
+              .fontSize(AppFont.TitleL)
               .fontWeight(FontWeight.Bold)
-              .fontColor(Theme.TEXT)
+              .fontColor($r('sys.color.font_primary'))
             Text(this.conversationId > 0 ? '会话 #' + this.conversationId + (this.currentModel.length > 0 ? ' · ' + this.currentModel : '') : '基于 DeepSeek · 可读取平台数据')
               .fontSize(10)
-              .fontColor(Theme.TEXT_FAINT)
+              .fontColor($r('sys.color.font_tertiary'))
           }
           .alignItems(HorizontalAlign.Start)
           .layoutWeight(1)
 
           Text('＋ 新对话')
-            .fontSize(12)
-            .fontColor(Theme.MINT)
-            .padding({ left: 10, right: 10, top: 6, bottom: 6 })
-            .borderRadius(10)
-            .border({ width: 1, color: Theme.MINT })
+            .fontSize(AppFont.Caption)
+            .fontWeight(FontWeight.Medium)
+            .fontColor(AppColor.Brand)
+            .padding({ left: AppSpace.Sm, right: AppSpace.Sm, top: 6, bottom: 6 })
+            .borderRadius(AppRadius.Pill)
+            .backgroundColor($r('sys.color.comp_background_tertiary'))
             .onClick(() => {
               this.newConversation()
             })
-          Text('💬')
-            .fontSize(18)
+          SymbolGlyph($r('sys.symbol.clock'))
+            .fontSize(22)
+            .fontColor([$r('sys.color.font_primary')])
             .onClick(() => {
               this.openConversations()
             })
-          Text('⚙️')
-            .fontSize(18)
+          SymbolGlyph($r('sys.symbol.gearshape'))
+            .fontSize(22)
+            .fontColor([$r('sys.color.font_primary')])
             .onClick(() => {
               this.openSettings()
             })
         }
         .width('100%')
-        .padding({ left: PAGE_PAD_H, right: PAGE_PAD_H, top: this.topInset + 12, bottom: 8 })
+        .padding({ left: PAGE_PAD_H, right: PAGE_PAD_H, top: WindowUtils.getStatusBarHeightVp() + 12, bottom: AppSpace.Xs })
 
         // 消息区
         Column() {
           if (this.messages.length === 0) {
-            Column({ space: 10 }) {
+            Column({ space: AppSpace.Xs }) {
               EmptyView({ icon: '🤖', text: '向 AI 提问关于你的一切：\n日程、习惯、财务、学习、体重…' })
               Text('试试：“总结一下我这周的学习进度”')
                 .fontSize(11)
-                .fontColor(Theme.CYAN)
+                .fontColor(AppColor.Brand)
               Text('也可以直接说：“明天下午三点提醒我看牙医”')
                 .fontSize(11)
-                .fontColor(Theme.MINT)
+                .fontColor(AppColor.Brand)
             }
           } else {
             List({ scroller: this.scroller, space: 0 }) {
@@ -697,19 +698,18 @@ export struct AiTab {
         if (this.voiceOn || this.voicePending) {
           Text(this.voiceOn ? '正在录音，说完点右侧方块结束' : '正在识别刚才说的话…')
             .fontSize(11)
-            .fontColor(this.voiceOn ? Theme.DANGER : Theme.TEXT_SUB)
+            .fontColor(this.voiceOn ? Theme.DANGER : $r('sys.color.font_secondary'))
             .width('100%')
-            .padding({ left: PAGE_PAD_H, bottom: 4 })
+            .padding({ left: PAGE_PAD_H, bottom: AppSpace.Xxs })
         }
-        Row({ space: 10 }) {
+        Row({ space: AppSpace.Xs }) {
           // 单行时靠对称内边距居中，输入多行时自然长高到 4 行为止（固定 height 会让 placeholder 顶在上面）
           TextArea({ placeholder: '输入你的问题…', text: this.input, controller: this.inputController })
-            .placeholderColor(Theme.TEXT_FAINT)
-            .fontColor(Theme.TEXT)
-            .fontSize(14)
-            .backgroundColor(Theme.INPUT_BG)
-            .borderRadius(14)
-            .border({ width: 1, color: Theme.BORDER })
+            .placeholderColor($r('sys.color.font_tertiary'))
+            .fontColor($r('sys.color.font_primary'))
+            .fontSize(AppFont.Body)
+            .backgroundColor($r('sys.color.comp_background_tertiary'))
+            .borderRadius(AppRadius.Xl)
             .constraintSize({ minHeight: 44 })
             .padding({ left: 14, right: 14, top: 11, bottom: 11 })
             .align(Alignment.Start)
@@ -724,38 +724,43 @@ export struct AiTab {
             .onBlur(() => {
               this.useResizeAvoidance(false)
             })
-          Text(this.voiceOn ? '⏹' : (this.voicePending ? '⏳' : '🎤'))
-            .fontSize(16)
-            .width(44)
-            .height(44)
-            .textAlign(TextAlign.Center)
-            .borderRadius(14)
-            .backgroundColor(Theme.INPUT_BG)
-            .border({ width: 1, color: this.voiceOn ? Theme.DANGER : Theme.BORDER })
-            .opacity(this.sending ? 0.5 : 1)
-            .onClick(() => {
-              if (this.voiceOn) {
-                this.stopVoice()
-              } else {
-                this.startVoice()
-              }
-            })
+          Stack() {
+            SymbolGlyph(this.voiceOn ? $r('sys.symbol.stop_circle_fill') : $r('sys.symbol.mic_fill'))
+              .fontSize(20)
+              .fontColor([this.voiceOn ? Theme.DANGER : $r('sys.color.font_primary')])
+          }
+          .width(44)
+          .height(44)
+          .borderRadius(AppRadius.Pill)
+          .backgroundColor(this.voiceOn ? Theme.DANGER_SOFT : $r('sys.color.comp_background_tertiary'))
+          .opacity(this.sending ? 0.5 : 1)
+          .onClick(() => {
+            if (this.voiceOn) {
+              this.stopVoice()
+            } else {
+              this.startVoice()
+            }
+          })
           Text(this.voiceOn ? '停止' : (this.sending ? '…' : '发送'))
-            .fontSize(14)
-            .fontWeight(FontWeight.Bold)
-            .fontColor('#FFFFFF')
+            .fontSize(AppFont.Body)
+            .fontWeight(FontWeight.Medium)
+            .fontColor(this.sending ? $r('sys.color.font_tertiary') : AppColor.OnBrand)
             .width(58)
             .height(44)
             .textAlign(TextAlign.Center)
-            .borderRadius(14)
-            .linearGradient({ angle: 135, colors: this.sending ? Theme.CARD_COLORS : Theme.BRAND_COLORS })
-            .opacity(this.sending ? 0.6 : 1)
+            .borderRadius(AppRadius.Pill)
+            .backgroundColor(this.sending ? $r('sys.color.comp_background_tertiary') : AppColor.Brand)
             .onClick(() => {
               this.send()
             })
         }
         .width('100%')
-        .padding({ left: PAGE_PAD_H, right: PAGE_PAD_H, bottom: 10, top: 6 })
+        .padding({
+          left: PAGE_PAD_H,
+          right: PAGE_PAD_H,
+          bottom: WindowUtils.getFloatingTabBottomVp(),
+          top: 6
+        })
         .alignItems(VerticalAlign.Bottom)
       }
       .width('100%')
@@ -764,7 +769,10 @@ export struct AiTab {
       .bindSheet($$this.showConv, this.convSheetBuilder(), {
         height: 620,
         dragBar: true,
-        backgroundColor: Theme.CARD_SOLID
+        preferType: SheetType.BOTTOM,
+        backgroundColor: AppMaterial.SheetBackground,
+        blurStyle: AppMaterial.SheetBlur,
+        systemMaterial: AppMaterial.Sheet
       })
     }
     .width('100%')
@@ -776,7 +784,10 @@ export struct AiTab {
     .bindSheet($$this.showSettings, this.settingsBuilder(), {
       height: 700,
       dragBar: true,
-      backgroundColor: Theme.CARD_SOLID
+      preferType: SheetType.BOTTOM,
+      backgroundColor: AppMaterial.SheetBackground,
+      blurStyle: AppMaterial.SheetBlur,
+      systemMaterial: AppMaterial.Sheet
     })
   }
 
@@ -796,13 +807,12 @@ export struct AiTab {
       .padding({ left: PAGE_PAD_H, right: PAGE_PAD_H, top: SHEET_PAD_TOP, bottom: 6 })
 
       if (this.renamingId > 0) {
-        Row({ space: 8 }) {
+        Row({ space: AppSpace.Xs }) {
           TextInput({ text: this.renameText })
-            .fontColor(Theme.TEXT)
-            .fontSize(13)
-            .backgroundColor(Theme.INPUT_BG)
-            .borderRadius(10)
-            .border({ width: 1, color: Theme.BORDER })
+            .fontColor($r('sys.color.font_primary'))
+            .fontSize(AppFont.Body)
+            .backgroundColor($r('sys.color.comp_background_tertiary'))
+            .borderRadius(AppRadius.Md)
             .height(40)
             .align(Alignment.Start)
             .layoutWeight(1)
@@ -836,22 +846,22 @@ export struct AiTab {
           ForEach(this.conversations, (item: AiConversationSummary) => {
             ListItem() {
               Column({ space: 6 }) {
-                Row({ space: 8 }) {
+                Row({ space: AppSpace.Xs }) {
                   Text(item.title)
-                    .fontSize(14)
+                    .fontSize(AppFont.Body)
                     .fontWeight(FontWeight.Bold)
-                    .fontColor(this.conversationId === item.id ? Theme.CYAN : Theme.TEXT)
+                    .fontColor(this.conversationId === item.id ? AppColor.Brand : $r('sys.color.font_primary'))
                     .maxLines(1)
                     .textOverflow({ overflow: TextOverflow.Ellipsis })
                     .layoutWeight(1)
                   Text(item.messageCount + ' 条')
                     .fontSize(10)
-                    .fontColor(Theme.TEXT_FAINT)
+                    .fontColor($r('sys.color.font_tertiary'))
                 }
                 .width('100%')
                 Text(item.preview.length > 0 ? item.preview : '（空会话）')
                   .fontSize(11)
-                  .fontColor(Theme.TEXT_SUB)
+                  .fontColor($r('sys.color.font_secondary'))
                   .maxLines(1)
                   .textOverflow({ overflow: TextOverflow.Ellipsis })
                   .width('100%')
@@ -859,11 +869,11 @@ export struct AiTab {
                   Text(item.lastMessageAt === null || item.lastMessageAt === undefined
                     ? item.createdAt : item.lastMessageAt)
                     .fontSize(10)
-                    .fontColor(Theme.TEXT_FAINT)
+                    .fontColor($r('sys.color.font_tertiary'))
                     .layoutWeight(1)
                   Text('重命名')
                     .fontSize(11)
-                    .fontColor(Theme.CYAN)
+                    .fontColor(AppColor.Brand)
                     .onClick(() => {
                       this.renamingId = item.id
                       this.renameText = item.title
@@ -877,7 +887,7 @@ export struct AiTab {
                 }
                 .width('100%')
               }
-              .padding({ left: PAGE_PAD_H, right: PAGE_PAD_H, top: 12, bottom: 12 })
+              .padding({ left: PAGE_PAD_H, right: PAGE_PAD_H, top: AppSpace.Sm, bottom: AppSpace.Sm })
               .border({ width: { bottom: 1 }, color: Theme.BORDER })
               .onClick(() => {
                 this.openConversation(item)
@@ -899,15 +909,14 @@ export struct AiTab {
       Column() {
         SheetHeader({ title: '模型配置' })
 
-        Text('API Key').fontSize(12).fontColor(Theme.TEXT_SUB).margin({ top: 14, bottom: 6 })
+        Text('API Key').fontSize(AppFont.Caption).fontColor($r('sys.color.font_secondary')).margin({ top: 14, bottom: 6 })
         // 输入框高度大于行高时，placeholder 与文本的竖向位置由 align 决定（textAlign 只管横向）
         TextInput({ placeholder: this.hasKey ? '已保存：' + this.keyPreview + '（留空则不修改）' : 'sk-…', text: this.apiKey })
-          .placeholderColor(Theme.TEXT_FAINT)
-          .fontColor(Theme.TEXT)
-          .fontSize(13)
-          .backgroundColor(Theme.INPUT_BG)
-          .borderRadius(10)
-          .border({ width: 1, color: Theme.BORDER })
+          .placeholderColor($r('sys.color.font_tertiary'))
+          .fontColor($r('sys.color.font_primary'))
+          .fontSize(AppFont.Body)
+          .backgroundColor($r('sys.color.comp_background_tertiary'))
+          .borderRadius(AppRadius.Md)
           .height(42)
           .align(Alignment.Start)
           .type(InputType.Password)
@@ -915,20 +924,19 @@ export struct AiTab {
             this.apiKey = value
           })
 
-        Text('接口地址').fontSize(12).fontColor(Theme.TEXT_SUB).margin({ top: 12, bottom: 6 })
+        Text('接口地址').fontSize(AppFont.Caption).fontColor($r('sys.color.font_secondary')).margin({ top: 12, bottom: 6 })
         TextInput({ text: this.baseUrl })
-          .fontColor(Theme.TEXT)
-          .fontSize(13)
-          .backgroundColor(Theme.INPUT_BG)
-          .borderRadius(10)
-          .border({ width: 1, color: Theme.BORDER })
+          .fontColor($r('sys.color.font_primary'))
+          .fontSize(AppFont.Body)
+          .backgroundColor($r('sys.color.comp_background_tertiary'))
+          .borderRadius(AppRadius.Md)
           .height(42)
           .align(Alignment.Start)
           .onChange((value: string) => {
             this.baseUrl = value
           })
 
-        Text('模型').fontSize(12).fontColor(Theme.TEXT_SUB).margin({ top: 12, bottom: 6 })
+        Text('模型').fontSize(AppFont.Caption).fontColor($r('sys.color.font_secondary')).margin({ top: 12, bottom: 6 })
         OptionChips({
           options: Options.AI_MODELS,
           selected: this.modelIndex,
@@ -938,41 +946,40 @@ export struct AiTab {
         })
 
         Text('Temperature：' + this.temperature.toFixed(1))
-          .fontSize(12)
-          .fontColor(Theme.TEXT_SUB)
+          .fontSize(AppFont.Caption)
+          .fontColor($r('sys.color.font_secondary'))
           .margin({ top: 14, bottom: 6 })
         Slider({ value: this.temperature, min: 0, max: 2, step: 0.1 })
-          .selectedColor(Theme.PRIMARY)
+          .selectedColor(AppColor.Brand)
           .trackColor(Theme.BORDER)
           .onChange((value: number) => {
             this.temperature = Math.round(value * 10) / 10
           })
 
-        Text('系统提示词').fontSize(12).fontColor(Theme.TEXT_SUB).margin({ top: 12, bottom: 6 })
+        Text('系统提示词').fontSize(AppFont.Caption).fontColor($r('sys.color.font_secondary')).margin({ top: 12, bottom: 6 })
         TextArea({ text: this.systemPrompt })
-          .fontColor(Theme.TEXT)
-          .fontSize(13)
-          .backgroundColor(Theme.INPUT_BG)
-          .borderRadius(10)
-          .border({ width: 1, color: Theme.BORDER })
+          .fontColor($r('sys.color.font_primary'))
+          .fontSize(AppFont.Body)
+          .backgroundColor($r('sys.color.comp_background_tertiary'))
+          .borderRadius(AppRadius.Md)
           .height(90)
           .onChange((value: string) => {
             this.systemPrompt = value
           })
 
         Text('数据上下文（AI 可读取的数据范围）')
-          .fontSize(12)
-          .fontColor(Theme.TEXT_SUB)
+          .fontSize(AppFont.Caption)
+          .fontColor($r('sys.color.font_secondary'))
           .margin({ top: 14, bottom: 6 })
         Flex({ wrap: FlexWrap.Wrap }) {
           ForEach(SCOPE_KEYS, (key: string, index: number) => {
             Chip({
               text: SCOPE_LABELS[index],
-              color: Theme.MINT,
+              color: AppColor.Brand,
               selected: this.scopeSelected.length > index && this.scopeSelected[index],
               small: true
             })
-              .margin({ right: 8, bottom: 8 })
+              .margin({ right: AppSpace.Xs, bottom: AppSpace.Xs })
               .onClick(() => {
                 const next: boolean[] = this.scopeSelected.slice()
                 next[index] = !next[index]
@@ -984,35 +991,36 @@ export struct AiTab {
 
         Row({ space: 10 }) {
           Text('测试连接')
-            .fontSize(13)
-            .fontColor(Theme.CYAN)
+            .fontSize(AppFont.Body)
+            .fontColor(AppColor.Brand)
             .layoutWeight(1)
             .textAlign(TextAlign.Center)
             .height(42)
-            .borderRadius(12)
-            .border({ width: 1, color: Theme.CYAN })
+            .borderRadius(AppRadius.Pill)
+            .backgroundColor($r('sys.color.comp_background_tertiary'))
             .onClick(() => {
               this.testConnection()
             })
           Text('清除密钥')
-            .fontSize(13)
+            .fontSize(AppFont.Body)
             .fontColor(Theme.WARN)
             .layoutWeight(1)
             .textAlign(TextAlign.Center)
             .height(42)
-            .borderRadius(12)
-            .border({ width: 1, color: Theme.WARN })
+            .borderRadius(AppRadius.Pill)
+            .backgroundColor($r('sys.color.comp_background_tertiary'))
             .onClick(() => {
               this.clearKey()
             })
           Text(this.savingSettings ? '保存中…' : '保存')
-            .fontSize(13)
-            .fontColor('#FFFFFF')
+            .fontSize(AppFont.Body)
+            .fontWeight(FontWeight.Medium)
+            .fontColor(AppColor.OnBrand)
             .layoutWeight(1)
             .textAlign(TextAlign.Center)
             .height(42)
-            .borderRadius(12)
-            .linearGradient({ angle: 135, colors: Theme.BRAND_COLORS })
+            .borderRadius(AppRadius.Pill)
+            .backgroundColor(AppColor.Brand)
             .onClick(() => {
               if (!this.savingSettings) {
                 this.saveSettings()
@@ -1020,12 +1028,12 @@ export struct AiTab {
             })
         }
         .width('100%')
-        .margin({ top: 18, bottom: 8 })
+        .margin({ top: 18, bottom: AppSpace.Xs })
 
         if (this.testMessage.length > 0) {
           Text(this.testMessage)
-            .fontSize(12)
-            .fontColor(Theme.TEXT_SUB)
+            .fontSize(AppFont.Caption)
+            .fontColor($r('sys.color.font_secondary'))
             .width('100%')
             .margin({ bottom: 10 })
         }

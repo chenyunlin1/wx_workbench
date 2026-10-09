@@ -1,43 +1,53 @@
 import { toast, Options } from '../../common/AppKit'
 import { Api, LearningPayload } from '../../api/Api'
 import { Theme } from '../../common/Theme'
-import { Session } from '../../store/Session'
+import { AppColor, AppFont, AppMaterial, AppRadius, AppSpace } from '../../theme/Theme'
+import { WindowUtils } from '../../utils/WindowUtils'
+import { Session, SessionStore } from '../../store/Session'
 import { LearningTask } from '../../model/Models'
 import { EmptyView, OptionChips, PAGE_PAD_H, SectionTitle, SheetDelete, SHEET_PAD_BOTTOM, SHEET_PAD_TOP, SheetHeader, SheetSubmit, StatTile, TechCard } from '../../components/Ui'
 
-function statusColor(status: string): string {
+function statusColor(status: string): ResourceColor {
   if (status === 'doing') {
     return Theme.WARN
   }
   if (status === 'done') {
-    return Theme.MINT
+    return AppColor.Brand
   }
-  return '#93A7C8'
+  return $r('sys.color.font_secondary')
 }
 
-@Component
+@ComponentV2
 export struct LearningTab {
-  @Consume('topInset') topInset: number
-  @Consume('nav') nav: NavPathStack
-  @StorageLink('dataVersion') @Watch('reload') version: number = 0
-  @State tasks: LearningTask[] = []
-  @State refreshing: boolean = false
-  @State statusIndex: number = 0
-  @State noteTotal: number = -1
-  @State noteLearned: number = -1
-  @State showForm: boolean = false
-  @State formId: number = 0
-  @State formTitle: string = ''
-  @State formDuration: string = ''
-  @State formStatusIndex: number = 0
-  @State saving: boolean = false
+  @Param nav: NavPathStack = new NavPathStack();
+  @Event onScrollerReady: (scroller: Scroller) => void = () => {};
+  @Local session: SessionStore = Session;
+  @Local tasks: LearningTask[] = [];
+  @Local refreshing: boolean = false;
+  @Local statusIndex: number = 0;
+  @Local noteTotal: number = -1;
+  @Local noteLearned: number = -1;
+  @Local showForm: boolean = false;
+  @Local formId: number = 0;
+  @Local formTitle: string = '';
+  @Local formDuration: string = '';
+  @Local formStatusIndex: number = 0;
+  @Local saving: boolean = false;
+
+  private scroller: Scroller = new Scroller();
 
   aboutToAppear(): void {
+    this.onScrollerReady(this.scroller);
     this.reload()
   }
 
-  reload(): void {
-    Api.listLearning().then((list) => {
+  @Monitor('session.dataVersion')
+  onDataVersionChange(): void {
+    this.reload()
+  }
+
+  private reload(): void {
+    Api.listLearning().then((list: LearningTask[]) => {
       this.tasks = list
     }).catch((err: Object) => {
       toast(err instanceof Error ? err.message : '加载失败')
@@ -48,31 +58,31 @@ export struct LearningTab {
   }
 
   /** 练习题库规模：只取「全部」与「已学」，待学由两者相减，避免第三次请求出现不一致的中间态 */
-  loadPracticeCount(): void {
-    Api.practiceCount('all').then((count) => {
+  private loadPracticeCount(): void {
+    Api.practiceCount('all').then((count: number) => {
       this.noteTotal = count
     }).catch(() => {
       this.noteTotal = 0
     })
-    Api.practiceCount('learned').then((count) => {
+    Api.practiceCount('learned').then((count: number) => {
       this.noteLearned = count
     }).catch(() => {
       this.noteLearned = 0
     })
   }
 
-  noteCountText(value: number): string {
+  private noteCountText(value: number): string {
     return value < 0 ? '…' : value.toString()
   }
 
-  notePendingCount(): number {
+  private notePendingCount(): number {
     if (this.noteTotal < 0 || this.noteLearned < 0) {
       return -1
     }
     return this.noteTotal - this.noteLearned
   }
 
-  startPractice(): void {
+  private startPractice(): void {
     if (this.noteTotal === 0) {
       toast('题库还没有笔记，先去「备忘」添加知识条目')
       return
@@ -80,7 +90,7 @@ export struct LearningTab {
     this.nav.pushPathByName('practice', null)
   }
 
-  filtered(): LearningTask[] {
+  private filtered(): LearningTask[] {
     if (this.statusIndex === 0) {
       return this.tasks
     }
@@ -88,7 +98,7 @@ export struct LearningTab {
     return this.tasks.filter((t: LearningTask) => t.status === target)
   }
 
-  totalMinutes(): number {
+  private totalMinutes(): number {
     let sum = 0
     for (const t of this.tasks) {
       sum += t.duration
@@ -96,11 +106,11 @@ export struct LearningTab {
     return sum
   }
 
-  doneCount(): number {
+  private doneCount(): number {
     return this.tasks.filter((t: LearningTask) => t.status === 'done').length
   }
 
-  openCreate(): void {
+  private openCreate(): void {
     this.formId = 0
     this.formTitle = ''
     this.formDuration = ''
@@ -108,7 +118,7 @@ export struct LearningTab {
     this.showForm = true
   }
 
-  openEdit(task: LearningTask): void {
+  private openEdit(task: LearningTask): void {
     this.formId = task.id
     this.formTitle = task.title
     this.formDuration = task.duration.toString()
@@ -116,7 +126,7 @@ export struct LearningTab {
     this.showForm = true
   }
 
-  setStatus(id: number, status: string): void {
+  private setStatus(id: number, status: string): void {
     const task = this.tasks.find((t: LearningTask) => t.id === id)
     if (task === undefined) {
       return
@@ -131,7 +141,7 @@ export struct LearningTab {
       })
   }
 
-  saveForm(): void {
+  private saveForm(): void {
     if (this.formTitle.trim().length === 0) {
       toast('请输入任务标题')
       return
@@ -163,7 +173,7 @@ export struct LearningTab {
     })
   }
 
-  removeTask(task: LearningTask): void {
+  private removeTask(task: LearningTask): void {
     Api.deleteLearning(task.id).then(() => {
       toast('已删除')
       this.showForm = false
@@ -178,21 +188,21 @@ export struct LearningTab {
     Text(Options.learningStatusLabel(status))
       .fontSize(10)
       .fontColor(statusColor(status))
-      .padding({ left: 8, right: 8, top: 3, bottom: 3 })
-      .borderRadius(999)
+      .padding({ left: AppSpace.Xs, right: AppSpace.Xs, top: 3, bottom: 3 })
+      .borderRadius(AppRadius.Pill)
       .border({ width: 1, color: statusColor(status) })
   }
 
   build() {
     Stack() {
       Refresh({ refreshing: $$this.refreshing }) {
-        Scroll() {
+        Scroll(this.scroller) {
           Column() {
             Row() {
               Text('学习')
-                .fontSize(20)
+                .fontSize(AppFont.TitleL)
                 .fontWeight(FontWeight.Bold)
-                .fontColor(Theme.TEXT)
+                .fontColor($r('sys.color.font_primary'))
                 .layoutWeight(1)
             }
             .width('100%')
@@ -202,19 +212,19 @@ export struct LearningTab {
             Column() {
               SectionTitle({ title: '知识练习' })
               TechCard() {
-                Column({ space: 12 }) {
+                Column({ space: AppSpace.Sm }) {
                   Row({ space: 10 }) {
                     StatTile({ weighted: true,
                       icon: '🗂️',
                       value: this.noteCountText(this.noteTotal),
                       label: '题库笔记',
-                      accent: Theme.CYAN
+                      accent: AppColor.Brand
                     })
                     StatTile({ weighted: true,
                       icon: '✅',
                       value: this.noteCountText(this.noteLearned),
                       label: '已学',
-                      accent: Theme.MINT
+                      accent: AppColor.Brand
                     })
                     StatTile({ weighted: true,
                       icon: '⏳',
@@ -226,17 +236,17 @@ export struct LearningTab {
                   .width('100%')
                   Text('闪卡记忆与填空选择，题目由知识库自动生成')
                     .fontSize(11)
-                    .fontColor(Theme.TEXT_FAINT)
+                    .fontColor($r('sys.color.font_tertiary'))
                     .width('100%')
                   Text('开始练习')
-                    .fontSize(15)
-                    .fontWeight(FontWeight.Bold)
-                    .fontColor('#FFFFFF')
+                    .fontSize(AppFont.BodyL)
+                    .fontWeight(FontWeight.Medium)
+                    .fontColor(AppColor.OnBrand)
                     .textAlign(TextAlign.Center)
                     .width('100%')
                     .height(46)
-                    .borderRadius(12)
-                    .linearGradient({ angle: 135, colors: Theme.BRAND_COLORS })
+                    .borderRadius(AppRadius.Pill)
+                    .backgroundColor(AppColor.Brand)
                     .onClick(() => {
                       this.startPractice()
                     })
@@ -253,11 +263,12 @@ export struct LearningTab {
               }
               .layoutWeight(1)
               Text('＋ 新任务')
-                .fontSize(12)
-                .fontColor('#FFFFFF')
-                .padding({ left: 12, right: 12, top: 7, bottom: 7 })
-                .borderRadius(11)
-                .linearGradient({ angle: 135, colors: Theme.BRAND_COLORS })
+                .fontSize(AppFont.Caption)
+                .fontWeight(FontWeight.Medium)
+                .fontColor(AppColor.OnBrand)
+                .padding({ left: AppSpace.Sm, right: AppSpace.Sm, top: 7, bottom: 7 })
+                .borderRadius(AppRadius.Pill)
+                .backgroundColor(AppColor.Brand)
                 .margin({ bottom: 10 })
                 .onClick(() => {
                   this.openCreate()
@@ -266,9 +277,9 @@ export struct LearningTab {
             .width('100%')
 
             Row({ space: 10 }) {
-              StatTile({ weighted: true, icon: '📋', value: this.tasks.length.toString(), label: '全部任务', accent: Theme.CYAN })
-              StatTile({ weighted: true, icon: '✅', value: this.doneCount().toString(), label: '已完成', accent: Theme.MINT })
-              StatTile({ weighted: true, icon: '⏱', value: this.totalMinutes().toString(), label: '总时长(分)', accent: Theme.VIOLET })
+              StatTile({ weighted: true, icon: '📋', value: this.tasks.length.toString(), label: '全部任务', accent: AppColor.Brand })
+              StatTile({ weighted: true, icon: '✅', value: this.doneCount().toString(), label: '已完成', accent: AppColor.Brand })
+              StatTile({ weighted: true, icon: '⏱', value: this.totalMinutes().toString(), label: '总时长(分)', accent: AppColor.BrandDark })
             }
             .width('100%')
 
@@ -282,67 +293,73 @@ export struct LearningTab {
               })
             }
             .width('100%')
-            .margin({ top: 12, bottom: 6 })
+            .margin({ top: AppSpace.Sm, bottom: 6 })
 
             if (this.filtered().length === 0) {
               EmptyView({ icon: '📖', text: '暂无学习任务，点击右上角新建' })
             } else {
               ForEach(this.filtered(), (task: LearningTask) => {
                 Column() {
-                TechCard() {
-                  Row({ space: 10 }) {
-                    Column({ space: 6 }) {
-                      Text(task.title)
-                        .fontSize(15)
-                        .fontWeight(FontWeight.Bold)
-                        .fontColor(task.status === 'done' ? Theme.TEXT_FAINT : Theme.TEXT)
-                        .decoration({ type: task.status === 'done' ? TextDecorationType.LineThrough : TextDecorationType.None })
-                        .maxLines(2)
-                        .textOverflow({ overflow: TextOverflow.Ellipsis })
-                        .width('100%')
-                      Row({ space: 8 }) {
-                        this.statusChip(task.status)
-                        Text('⏱ ' + task.duration + ' 分钟')
+                  TechCard() {
+                    Row({ space: 10 }) {
+                      Column({ space: 6 }) {
+                        Text(task.title)
+                          .fontSize(AppFont.BodyL)
+                          .fontWeight(FontWeight.Bold)
+                          .fontColor(task.status === 'done' ? $r('sys.color.font_tertiary') : $r('sys.color.font_primary'))
+                          .decoration({ type: task.status === 'done' ? TextDecorationType.LineThrough : TextDecorationType.None })
+                          .maxLines(2)
+                          .textOverflow({ overflow: TextOverflow.Ellipsis })
+                          .width('100%')
+                        Row({ space: AppSpace.Xs }) {
+                          this.statusChip(task.status)
+                          Text('⏱ ' + task.duration + ' 分钟')
+                            .fontSize(11)
+                            .fontColor($r('sys.color.font_secondary'))
+                        }
+                      }
+                      .alignItems(HorizontalAlign.Start)
+                      .layoutWeight(1)
+
+                      Column({ space: 6 }) {
+                        Text(task.status === 'todo' ? '开始' : task.status === 'doing' ? '完成' : '重开')
                           .fontSize(11)
-                          .fontColor(Theme.TEXT_SUB)
+                          .fontWeight(FontWeight.Medium)
+                          .fontColor(AppColor.OnBrand)
+                          .padding({ left: 10, right: 10, top: 5, bottom: 5 })
+                          .borderRadius(AppRadius.Pill)
+                          .backgroundColor(AppColor.Brand)
+                          .onClick(() => {
+                            if (task.status === 'todo') {
+                              this.setStatus(task.id, 'doing')
+                            } else if (task.status === 'doing') {
+                              this.setStatus(task.id, 'done')
+                            } else {
+                              this.setStatus(task.id, 'todo')
+                            }
+                          })
+                        Text('编辑')
+                          .fontSize(11)
+                          .fontColor(AppColor.Brand)
+                          .onClick(() => {
+                            this.openEdit(task)
+                          })
                       }
                     }
-                    .alignItems(HorizontalAlign.Start)
-                    .layoutWeight(1)
-
-                    Column({ space: 6 }) {
-                      Text(task.status === 'todo' ? '开始' : task.status === 'doing' ? '完成' : '重开')
-                        .fontSize(11)
-                        .fontColor('#FFFFFF')
-                        .padding({ left: 10, right: 10, top: 5, bottom: 5 })
-                        .borderRadius(10)
-                        .linearGradient({ angle: 135, colors: Theme.BRAND_COLORS })
-                        .onClick(() => {
-                          if (task.status === 'todo') {
-                            this.setStatus(task.id, 'doing')
-                          } else if (task.status === 'doing') {
-                            this.setStatus(task.id, 'done')
-                          } else {
-                            this.setStatus(task.id, 'todo')
-                          }
-                        })
-                      Text('编辑')
-                        .fontSize(11)
-                        .fontColor(Theme.CYAN)
-                        .onClick(() => {
-                          this.openEdit(task)
-                        })
-                    }
+                    .width('100%')
                   }
-                  .width('100%')
                 }
-                }
-                  .width('100%')
-                .margin({ bottom: 10 })
+                .width('100%')
+                .margin({ bottom: AppSpace.Xs })
               }, (task: LearningTask) => task.id.toString() + '-' + task.status)
             }
           }
-          .padding({ left: 16, right: 16, top: this.topInset + 12, bottom: 20 })
+          .padding({
+            left: AppSpace.Md,
+            right: AppSpace.Md,
+            top: WindowUtils.getStatusBarHeightVp() + 12,
+            bottom: WindowUtils.getFloatingTabBottomVp()
+          })
           .constraintSize({ minHeight: '100%' })
         }
         .scrollBar(BarState.Off)
@@ -358,7 +375,10 @@ export struct LearningTab {
     .bindSheet($$this.showForm, this.formBuilder(), {
       height: 460,
       dragBar: true,
-      backgroundColor: Theme.CARD_SOLID
+      preferType: SheetType.BOTTOM,
+      backgroundColor: AppMaterial.SheetBackground,
+      blurStyle: AppMaterial.SheetBlur,
+      systemMaterial: AppMaterial.Sheet
     })
   }
 
@@ -367,28 +387,26 @@ export struct LearningTab {
     Column() {
       SheetHeader({ title: this.formId === 0 ? '新建学习任务' : '编辑学习任务' })
 
-      Text('标题').fontSize(12).fontColor(Theme.TEXT_SUB).margin({ top: 14, bottom: 6 })
+      Text('标题').fontSize(AppFont.Caption).fontColor($r('sys.color.font_secondary')).margin({ top: 14, bottom: 6 })
       TextInput({ placeholder: '任务标题', text: this.formTitle })
-        .placeholderColor(Theme.TEXT_FAINT)
-        .fontColor(Theme.TEXT)
-        .fontSize(14)
-        .backgroundColor(Theme.INPUT_BG)
-        .borderRadius(10)
-        .border({ width: 1, color: Theme.BORDER })
+        .placeholderColor($r('sys.color.font_tertiary'))
+        .fontColor($r('sys.color.font_primary'))
+        .fontSize(AppFont.Body)
+        .backgroundColor($r('sys.color.comp_background_tertiary'))
+        .borderRadius(AppRadius.Md)
         .height(42)
         .align(Alignment.Start)
         .onChange((value: string) => {
           this.formTitle = value
         })
 
-      Text('学习时长（分钟）').fontSize(12).fontColor(Theme.TEXT_SUB).margin({ top: 14, bottom: 6 })
+      Text('学习时长（分钟）').fontSize(AppFont.Caption).fontColor($r('sys.color.font_secondary')).margin({ top: 14, bottom: 6 })
       TextInput({ placeholder: '例如 60', text: this.formDuration })
-        .placeholderColor(Theme.TEXT_FAINT)
-        .fontColor(Theme.TEXT)
-        .fontSize(14)
-        .backgroundColor(Theme.INPUT_BG)
-        .borderRadius(10)
-        .border({ width: 1, color: Theme.BORDER })
+        .placeholderColor($r('sys.color.font_tertiary'))
+        .fontColor($r('sys.color.font_primary'))
+        .fontSize(AppFont.Body)
+        .backgroundColor($r('sys.color.comp_background_tertiary'))
+        .borderRadius(AppRadius.Md)
         .height(42)
         .align(Alignment.Start)
         .type(InputType.Number)
@@ -396,7 +414,7 @@ export struct LearningTab {
           this.formDuration = value
         })
 
-      Text('状态').fontSize(12).fontColor(Theme.TEXT_SUB).margin({ top: 14, bottom: 6 })
+      Text('状态').fontSize(AppFont.Caption).fontColor($r('sys.color.font_secondary')).margin({ top: 14, bottom: 6 })
       OptionChips({
         options: ['待开始', '进行中', '已完成'],
         selected: this.formStatusIndex,

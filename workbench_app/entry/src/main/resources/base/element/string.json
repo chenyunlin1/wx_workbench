@@ -1,20 +1,288 @@
 {
   "string": [
     {
-      "name": "module_desc",
-      "value": "LifeOS 工作台鸿蒙客户端"
-    },
-    {
       "name": "EntryAbility_desc",
-      "value": "LifeOS 工作台主入口"
+      "value": "万象工作台主入口"
     },
     {
       "name": "EntryAbility_label",
-      "value": "LifeOS 工作台"
+      "value": "万象工作台"
+    },
+    {
+      "name": "about_compliance_body",
+      "value": "此处为模板占位内容：请根据应用实际的功能、内容来源与合规要求，填写合规说明。"
+    },
+    {
+      "name": "about_compliance_title",
+      "value": "合规说明"
+    },
+    {
+      "name": "about_open_source",
+      "value": "开源声明"
+    },
+    {
+      "name": "about_title",
+      "value": "关于"
+    },
+    {
+      "name": "about_usage_body",
+      "value": "此处为模板占位内容：请填写使用提醒与注意事项。"
+    },
+    {
+      "name": "about_usage_title",
+      "value": "使用提醒"
+    },
+    {
+      "name": "app_brand_name",
+      "value": "万象工作台"
+    },
+    {
+      "name": "app_description",
+      "value": "万象工作台：日程、备忘、学习、财务与 AI 助手的个人效率工具"
+    },
+    {
+      "name": "app_icon_back",
+      "value": "返回"
+    },
+    {
+      "name": "app_icon_cartoon",
+      "value": "小狐狸"
+    },
+    {
+      "name": "app_icon_cartooncat",
+      "value": "卡通猫"
+    },
+    {
+      "name": "app_icon_cartoondog",
+      "value": "卡通狗"
+    },
+    {
+      "name": "app_icon_change_failed",
+      "value": "图标切换未完成，请稍后重试"
+    },
+    {
+      "name": "app_icon_changed",
+      "value": "图标已切换，返回桌面查看"
+    },
+    {
+      "name": "app_icon_clay",
+      "value": "黏土"
+    },
+    {
+      "name": "app_icon_current",
+      "value": "使用中"
+    },
+    {
+      "name": "app_icon_default",
+      "value": "默认"
+    },
+    {
+      "name": "app_icon_embroidery",
+      "value": "刺绣"
+    },
+    {
+      "name": "app_icon_enamel",
+      "value": "珐琅"
+    },
+    {
+      "name": "app_icon_glass",
+      "value": "磨砂玻璃"
+    },
+    {
+      "name": "app_icon_hint",
+      "value": "点击喜欢的图标，更换桌面上的应用图标"
+    },
+    {
+      "name": "app_icon_ink",
+      "value": "水墨"
+    },
+    {
+      "name": "app_icon_leather",
+      "value": "拟物"
+    },
+    {
+      "name": "app_icon_origami",
+      "value": "折纸"
+    },
+    {
+      "name": "app_icon_retro",
+      "value": "复古搪瓷"
+    },
+    {
+      "name": "app_icon_retry",
+      "value": "读取当前图标失败，点击重试"
+    },
+    {
+      "name": "app_icon_title",
+      "value": "图标主题"
+    },
+    {
+      "name": "app_icon_unsupported",
+      "value": "当前系统暂不支持直接切换桌面图标，可预览下方样式，升级系统后使用"
+    },
+    {
+      "name": "appearance_accent",
+      "value": "主题色"
+    },
+    {
+      "name": "appearance_accent_blue",
+      "value": "晴空蓝"
+    },
+    {
+      "name": "appearance_accent_default",
+      "value": "玫瑰红"
+    },
+    {
+      "name": "appearance_accent_green",
+      "value": "苔藓绿"
+    },
+    {
+      "name": "appearance_accent_hex_hint",
+      "value": "自定义色值，如 #8E55B8"
+    },
+    {
+      "name": "appearance_accent_hint",
+      "value": "用于按钮、选中状态与沉浸光感颜色。"
+    },
+    {
+      "name": "appearance_accent_invalid",
+      "value": "请输入 # 加六位十六进制色值"
+    },
+    {
+      "name": "appearance_accent_orange",
+      "value": "橙色"
+    },
+    {
+      "name": "appearance_accent_purple",
+      "value": "鸢尾紫"
+    },
+    {
+      "name": "appearance_accent_rose",
+      "value": "玫瑰红"
+    },
+    {
+      "name": "appearance_accent_teal",
+      "value": "青绿色"
+    },
+    {
+      "name": "appearance_apply",
+      "value": "应用"
+    },
+    {
+      "name": "appearance_material",
+      "value": "材质效果"
+    },
+    {
+      "name": "appearance_material_balanced",
+      "value": "均衡"
+    },
+    {
+      "name": "appearance_material_strong",
+      "value": "强"
+    },
+    {
+      "name": "appearance_material_weak",
+      "value": "弱"
+    },
+    {
+      "name": "appearance_save_failed",
+      "value": "外观设置保存失败，请重试"
+    },
+    {
+      "name": "guide_common_top_action",
+      "value": "双击「首页 / 备忘 / 学习 / AI / 我的」页签"
+    },
+    {
+      "name": "guide_common_top_desc",
+      "value": "快速回到当前页面顶部。"
+    },
+    {
+      "name": "guide_group_common",
+      "value": "通用"
+    },
+    {
+      "name": "guide_title",
+      "value": "使用说明"
+    },
+    {
+      "name": "module_desc",
+      "value": "万象工作台主模块"
     },
     {
       "name": "mic_reason",
       "value": "用于 AI 助手的语音输入，把说的话转成文字"
+    },
+    {
+      "name": "open_source_placeholder_body",
+      "value": "当前模板未引入第三方开源组件。后续新增依赖时，请在此逐项声明组件名称、版本、来源与许可类型。"
+    },
+    {
+      "name": "open_source_section_components",
+      "value": "一、开源组件"
+    },
+    {
+      "name": "privacy_placeholder_body",
+      "value": "此处为模板占位内容。发布前请根据应用实际收集的信息、申请的系统权限、使用的第三方服务与数据保存方式，替换为完整的隐私政策。"
+    },
+    {
+      "name": "privacy_placeholder_title",
+      "value": "隐私政策说明"
+    },
+    {
+      "name": "privacy_title",
+      "value": "隐私政策"
+    },
+    {
+      "name": "settings_default_tab",
+      "value": "默认打开"
+    },
+    {
+      "name": "settings_group_appearance",
+      "value": "外观"
+    },
+    {
+      "name": "settings_group_launch",
+      "value": "启动"
+    },
+    {
+      "name": "settings_theme_dark",
+      "value": "深色模式"
+    },
+    {
+      "name": "settings_theme_follow_system",
+      "value": "跟随系统"
+    },
+    {
+      "name": "settings_theme_light",
+      "value": "浅色模式"
+    },
+    {
+      "name": "settings_theme_mode",
+      "value": "主题模式"
+    },
+    {
+      "name": "settings_title",
+      "value": "设置"
+    },
+    {
+      "name": "tab_ai",
+      "value": "AI"
+    },
+    {
+      "name": "tab_home",
+      "value": "首页"
+    },
+    {
+      "name": "tab_learning",
+      "value": "学习"
+    },
+    {
+      "name": "tab_notes",
+      "value": "备忘"
+    },
+    {
+      "name": "tab_profile",
+      "value": "我的"
     }
   ]
 }

@@ -1,47 +1,48 @@
 import { Fmt, Options, toast } from '../../common/AppKit'
 import { Api } from '../../api/Api'
 import { Theme } from '../../common/Theme'
+import { AppColor, AppFont, AppMaterial, AppRadius, AppSpace } from '../../theme/Theme'
 import { Session } from '../../store/Session'
-import { Workout, WorkoutDay, WorkoutPayload, WorkoutStats } from '../../model/Models'
+import { Workout, WorkoutDay, WorkoutListResult, WorkoutPayload, WorkoutStats } from '../../model/Models'
 import { EmptyView, MiniBar, OptionChips, PAGE_PAD_H, PAGE_SCROLL_BOTTOM, PageHeader, SectionTitle, SheetDelete, SHEET_PAD_BOTTOM, SHEET_PAD_TOP, SheetHeader, SheetSubmit, StatTile, TechCard } from '../../components/Ui'
 
-interface TypeAgg {
-  count: number
-  duration: number
-  calories: number
+class TypeAgg {
+  count: number = 0;
+  duration: number = 0;
+  calories: number = 0;
 }
 
-@Component
+@ComponentV2
 export struct WorkoutPage {
-  @Consume('nav') nav: NavPathStack
-  @State stats: WorkoutStats | null = null
-  @State workouts: Workout[] = []
-  @State total: number = 0
-  @State daysIndex: number = 0
-  @State refreshing: boolean = false
-  @State loading: boolean = true
-  @State showForm: boolean = false
-  @State formId: number = 0
-  @State formTypeIndex: number = 0
-  @State formTitle: string = ''
-  @State formDuration: string = ''
-  @State formCalories: string = ''
-  @State formDistance: string = ''
-  @State formIntensityIndex: number = 1
-  @State formDate: string = Fmt.today()
-  @State formNote: string = ''
-  @State saving: boolean = false
+  @Param nav: NavPathStack = new NavPathStack();
+  @Local stats: WorkoutStats | null = null;
+  @Local workouts: Workout[] = [];
+  @Local total: number = 0;
+  @Local daysIndex: number = 0;
+  @Local refreshing: boolean = false;
+  @Local loading: boolean = true;
+  @Local showForm: boolean = false;
+  @Local formId: number = 0;
+  @Local formTypeIndex: number = 0;
+  @Local formTitle: string = '';
+  @Local formDuration: string = '';
+  @Local formCalories: string = '';
+  @Local formDistance: string = '';
+  @Local formIntensityIndex: number = 1;
+  @Local formDate: string = Fmt.today();
+  @Local formNote: string = '';
+  @Local saving: boolean = false;
 
   aboutToAppear(): void {
     this.reload()
   }
 
-  days(): number {
+  private days(): number {
     return [7, 14, 30][this.daysIndex]
   }
 
-  reload(): void {
-    Api.workoutStats(this.days()).then((data) => {
+  private reload(): void {
+    Api.workoutStats(this.days()).then((data: WorkoutStats) => {
       this.stats = data
     }).catch((err: Object) => {
       toast(err instanceof Error ? err.message : '加载统计失败')
@@ -51,7 +52,7 @@ export struct WorkoutPage {
       'pageSize': '50',
       'days': this.days().toString()
     }
-    Api.listWorkouts(query).then((result) => {
+    Api.listWorkouts(query).then((result: WorkoutListResult) => {
       this.workouts = result.items
       this.total = result.total
     }).catch((err: Object) => {
@@ -62,7 +63,7 @@ export struct WorkoutPage {
     })
   }
 
-  maxDailyDuration(): number {
+  private maxDailyDuration(): number {
     if (this.stats === null) {
       return 1
     }
@@ -75,7 +76,7 @@ export struct WorkoutPage {
     return max
   }
 
-  typeAgg(type: string): TypeAgg {
+  private typeAgg(type: string): TypeAgg {
     let count = 0
     let duration = 0
     let calories = 0
@@ -92,7 +93,7 @@ export struct WorkoutPage {
     return agg
   }
 
-  openCreate(): void {
+  private openCreate(): void {
     this.formId = 0
     this.formTypeIndex = 0
     this.formTitle = ''
@@ -105,7 +106,7 @@ export struct WorkoutPage {
     this.showForm = true
   }
 
-  openEdit(item: Workout): void {
+  private openEdit(item: Workout): void {
     this.formId = item.id
     this.formTypeIndex = Math.max(0, Options.WORKOUT_TYPES.indexOf(item.type))
     this.formTitle = item.title === null || item.title === undefined ? '' : item.title
@@ -118,7 +119,7 @@ export struct WorkoutPage {
     this.showForm = true
   }
 
-  pickDate(): void {
+  private pickDate(): void {
     const base = this.formDate.length === 10 ? Fmt.parse(this.formDate + ' 09:00:00') : new Date()
     DatePickerDialog.show({
       start: new Date(2020, 0, 1),
@@ -130,7 +131,7 @@ export struct WorkoutPage {
     })
   }
 
-  saveForm(): void {
+  private saveForm(): void {
     const duration = parseInt(this.formDuration.length === 0 ? '0' : this.formDuration)
     if (isNaN(duration) || duration <= 0) {
       toast('请输入有效时长（分钟）')
@@ -172,7 +173,7 @@ export struct WorkoutPage {
     })
   }
 
-  removeWorkout(id: number): void {
+  private removeWorkout(id: number): void {
     Api.deleteWorkout(id).then(() => {
       toast('已删除')
       this.showForm = false
@@ -183,12 +184,11 @@ export struct WorkoutPage {
   }
 
   build() {
-    NavDestination() {
     Stack() {
       Refresh({ refreshing: $$this.refreshing }) {
         Scroll() {
           Column() {
-            PageHeader({ title: '减脂健身', actionLabel: '＋ 训练', onAction: (): void => {
+            PageHeader({ navStack: this.nav, title: '减脂健身', actionLabel: '＋ 训练', onAction: (): void => {
               this.openCreate()
             } })
 
@@ -203,7 +203,7 @@ export struct WorkoutPage {
               })
             }
             .width('100%')
-            .padding({ bottom: 8 })
+            .padding({ bottom: AppSpace.Xs })
 
             if (this.loading) {
               EmptyView({ icon: '⏳', text: '加载中…' })
@@ -214,13 +214,13 @@ export struct WorkoutPage {
                   icon: '🏃',
                   value: this.stats === null ? '-' : this.stats.sessions.toString(),
                   label: '训练次数',
-                  accent: Theme.CYAN
+                  accent: AppColor.Brand
                 })
                 StatTile({ weighted: true,
                   icon: '⏱',
                   value: this.stats === null ? '-' : this.stats.duration + ' 分',
                   label: '总时长',
-                  accent: Theme.VIOLET
+                  accent: AppColor.BrandDark
                 })
               }
               .width('100%')
@@ -235,7 +235,7 @@ export struct WorkoutPage {
                   icon: '📅',
                   value: this.stats === null ? '-' : this.stats.streakDays + ' 天',
                   label: '连续训练',
-                  accent: Theme.MINT
+                  accent: AppColor.Brand
                 })
               }
               .width('100%')
@@ -246,17 +246,14 @@ export struct WorkoutPage {
               TechCard() {
                 Column({ space: 10 }) {
                   SectionTitle({ title: '每日训练时长（分钟）' })
-                  Row({ space: 4 }) {
+                  Row({ space: AppSpace.Xxs }) {
                     ForEach(this.stats === null ? [] : this.stats.daily, (day: WorkoutDay) => {
                       Column() {
                         Column()
                           .width('100%')
                           .height(day.duration > 0 ? 12 + (day.duration / this.maxDailyDuration()) * 48 : 3)
                           .borderRadius(4)
-                          .linearGradient({
-                            angle: 180,
-                            colors: day.duration > 0 ? Theme.MINT_COLORS : Theme.CARD_COLORS
-                          })
+                          .backgroundColor(day.duration > 0 ? AppColor.Brand : $r('sys.color.comp_background_tertiary'))
                       }
                       .height(64)
                       .justifyContent(FlexAlign.End)
@@ -283,14 +280,14 @@ export struct WorkoutPage {
               }
               }
                 .width('100%')
-              .margin({ top: 12 })
+              .margin({ top: AppSpace.Sm })
 
               // 记录列表
               Column() {
                 SectionTitle({ title: '训练记录（' + this.total + '）' })
               }
               .width('100%')
-              .margin({ top: 16 })
+              .margin({ top: AppSpace.Md })
 
               if (this.workouts.length === 0) {
                 EmptyView({ icon: '🏋️', text: '该时间段还没有训练记录' })
@@ -298,24 +295,24 @@ export struct WorkoutPage {
                 ForEach(this.workouts, (item: Workout) => {
                   Column() {
                   TechCard() {
-                    Row({ space: 12 }) {
+                    Row({ space: AppSpace.Sm }) {
                       Text(Options.workoutEmoji(item.type))
                         .fontSize(24)
                       Column({ space: 4 }) {
                         Text(item.title === null || item.title === undefined || item.title.length === 0
                           ? Options.workoutTypeName(item.type) : item.title)
-                          .fontSize(15)
+                          .fontSize(AppFont.BodyL)
                           .fontWeight(FontWeight.Bold)
-                          .fontColor(Theme.TEXT)
+                          .fontColor($r('sys.color.font_primary'))
                           .maxLines(1)
                           .textOverflow({ overflow: TextOverflow.Ellipsis })
-                        Row({ space: 8 }) {
+                        Row({ space: AppSpace.Xs }) {
                           Text(Fmt.dateOnly(item.workoutDate))
                             .fontSize(11)
-                            .fontColor(Theme.TEXT_SUB)
+                            .fontColor($r('sys.color.font_secondary'))
                           Text('⏱ ' + item.duration + '分')
                             .fontSize(11)
-                            .fontColor(Theme.CYAN)
+                            .fontColor(AppColor.Brand)
                           if (item.calories !== null && item.calories !== undefined) {
                             Text('🔥 ' + item.calories)
                               .fontSize(11)
@@ -324,7 +321,7 @@ export struct WorkoutPage {
                           if (item.distance !== null && item.distance !== undefined) {
                             Text('📏 ' + item.distance + 'km')
                               .fontSize(11)
-                              .fontColor(Theme.MINT)
+                              .fontColor(AppColor.Brand)
                           }
                         }
                       }
@@ -333,13 +330,13 @@ export struct WorkoutPage {
                       Column({ space: 6 }) {
                         Text(Options.intensityLabel(item.intensity))
                           .fontSize(10)
-                          .fontColor(Theme.TEXT_SUB)
-                          .padding({ left: 8, right: 8, top: 3, bottom: 3 })
-                          .borderRadius(999)
-                          .border({ width: 1, color: Theme.BORDER_GLOW })
+                          .fontColor($r('sys.color.font_secondary'))
+                          .padding({ left: AppSpace.Xs, right: AppSpace.Xs, top: 3, bottom: 3 })
+                          .borderRadius(AppRadius.Pill)
+                          .border({ width: 1, color: AppColor.Divider })
                         Text('✎')
-                          .fontSize(13)
-                          .fontColor(Theme.TEXT_FAINT)
+                          .fontSize(AppFont.BodyL)
+                          .fontColor($r('sys.color.font_tertiary'))
                           .onClick(() => {
                             this.openEdit(item)
                           })
@@ -349,7 +346,7 @@ export struct WorkoutPage {
                   }
                   }
                     .width('100%')
-                  .margin({ bottom: 10 })
+                  .margin({ bottom: AppSpace.Xs })
                 }, (item: Workout) => item.id.toString() + '-' + item.updatedAt)
               }
             }
@@ -367,31 +364,31 @@ export struct WorkoutPage {
     }
     .width('100%')
     .height('100%')
-    .backgroundColor(Theme.BG)
+    .backgroundColor($r('sys.color.background_primary'))
     .bindSheet($$this.showForm, this.formBuilder(), {
       height: 680,
       dragBar: true,
-      backgroundColor: Theme.CARD_SOLID
+      preferType: SheetType.BOTTOM,
+      backgroundColor: AppMaterial.SheetBackground,
+      blurStyle: AppMaterial.SheetBlur,
+      systemMaterial: AppMaterial.Sheet
     })
-    }
-    .hideTitleBar(true)
-    .backgroundColor(Theme.BG)
   }
 
   @Builder
   typeRow(type: string) {
     Row({ space: 10 }) {
       Text(Options.workoutTypeLabel(type))
-        .fontSize(12)
-        .fontColor(Theme.TEXT)
+        .fontSize(AppFont.Caption)
+        .fontColor($r('sys.color.font_primary'))
         .width(64)
       Text(this.typeAgg(type).count + '次')
         .fontSize(11)
-        .fontColor(Theme.TEXT_SUB)
+        .fontColor($r('sys.color.font_secondary'))
         .width(40)
       Text(this.typeAgg(type).duration + '分')
         .fontSize(11)
-        .fontColor(Theme.CYAN)
+        .fontColor(AppColor.Brand)
         .width(48)
       Column() {
         MiniBar({ ratio: this.stats === null || this.stats.duration === 0
@@ -408,33 +405,25 @@ export struct WorkoutPage {
       Column() {
         SheetHeader({ title: this.formId === 0 ? '记录训练' : '编辑训练' })
 
-        Text('类型').fontSize(12).fontColor(Theme.TEXT_SUB).margin({ top: 14, bottom: 6 })
-        Flex({ wrap: FlexWrap.Wrap }) {
-          ForEach(Options.WORKOUT_TYPES, (type: string, index: number) => {
-            Text(Options.workoutTypeLabel(type))
-              .fontSize(12)
-              .fontColor(this.formTypeIndex === index ? '#FFFFFF' : Theme.TEXT_SUB)
-              .padding({ left: 10, right: 10, top: 6, bottom: 6 })
-              .borderRadius(10)
-              .backgroundColor(this.formTypeIndex === index ? Theme.PRIMARY : Theme.INPUT_BG)
-              .border({ width: 1, color: this.formTypeIndex === index ? Theme.PRIMARY : Theme.BORDER })
-              .margin({ right: 8, bottom: 8 })
-              .onClick(() => {
-                this.formTypeIndex = index
-              })
-          }, (type: string) => type + this.formTypeIndex.toString())
-        }
-        .width('100%')
+        Text('类型').fontSize(AppFont.Caption).fontColor($r('sys.color.font_secondary')).margin({ top: 14, bottom: 6 })
+        OptionChips({
+          options: Options.WORKOUT_TYPES,
+          labels: Options.WORKOUT_TYPES.map((type: string): string => Options.workoutTypeLabel(type)),
+          selected: this.formTypeIndex,
+          onSelect: (index: number) => {
+            this.formTypeIndex = index
+          }
+        })
 
         Row({ space: 10 }) {
           Column() {
-            Text('时长（分钟）').fontSize(12).fontColor(Theme.TEXT_SUB).margin({ bottom: 6 })
+            Text('时长（分钟）').fontSize(AppFont.Caption).fontColor($r('sys.color.font_secondary')).margin({ bottom: 6 })
             TextInput({ placeholder: '45', text: this.formDuration })
-              .fontColor(Theme.TEXT)
-              .fontSize(14)
-              .backgroundColor(Theme.INPUT_BG)
-              .borderRadius(10)
-              .border({ width: 1, color: Theme.BORDER })
+              .placeholderColor($r('sys.color.font_tertiary'))
+              .fontColor($r('sys.color.font_primary'))
+              .fontSize(AppFont.Body)
+              .backgroundColor($r('sys.color.comp_background_tertiary'))
+              .borderRadius(AppRadius.Md)
               .height(42)
               .align(Alignment.Start)
               .type(InputType.Number)
@@ -444,13 +433,13 @@ export struct WorkoutPage {
           }
           .layoutWeight(1)
           Column() {
-            Text('消耗（kcal，可选）').fontSize(12).fontColor(Theme.TEXT_SUB).margin({ bottom: 6 })
+            Text('消耗（kcal，可选）').fontSize(AppFont.Caption).fontColor($r('sys.color.font_secondary')).margin({ bottom: 6 })
             TextInput({ placeholder: '300', text: this.formCalories })
-              .fontColor(Theme.TEXT)
-              .fontSize(14)
-              .backgroundColor(Theme.INPUT_BG)
-              .borderRadius(10)
-              .border({ width: 1, color: Theme.BORDER })
+              .placeholderColor($r('sys.color.font_tertiary'))
+              .fontColor($r('sys.color.font_primary'))
+              .fontSize(AppFont.Body)
+              .backgroundColor($r('sys.color.comp_background_tertiary'))
+              .borderRadius(AppRadius.Md)
               .height(42)
               .align(Alignment.Start)
               .type(InputType.Number)
@@ -461,16 +450,16 @@ export struct WorkoutPage {
           .layoutWeight(1)
         }
         .width('100%')
-        .margin({ top: 4 })
+        .margin({ top: AppSpace.Xxs })
 
         if (this.showDistance()) {
-          Text('距离（km，可选）').fontSize(12).fontColor(Theme.TEXT_SUB).margin({ top: 12, bottom: 6 })
+          Text('距离（km，可选）').fontSize(AppFont.Caption).fontColor($r('sys.color.font_secondary')).margin({ top: 12, bottom: 6 })
           TextInput({ placeholder: '5.0', text: this.formDistance })
-            .fontColor(Theme.TEXT)
-            .fontSize(14)
-            .backgroundColor(Theme.INPUT_BG)
-            .borderRadius(10)
-            .border({ width: 1, color: Theme.BORDER })
+            .placeholderColor($r('sys.color.font_tertiary'))
+            .fontColor($r('sys.color.font_primary'))
+            .fontSize(AppFont.Body)
+            .backgroundColor($r('sys.color.comp_background_tertiary'))
+            .borderRadius(AppRadius.Md)
             .height(42)
             .align(Alignment.Start)
             .type(InputType.NUMBER_DECIMAL)
@@ -479,20 +468,20 @@ export struct WorkoutPage {
             })
         }
 
-        Text('训练名称（可选）').fontSize(12).fontColor(Theme.TEXT_SUB).margin({ top: 12, bottom: 6 })
+        Text('训练名称（可选）').fontSize(AppFont.Caption).fontColor($r('sys.color.font_secondary')).margin({ top: 12, bottom: 6 })
         TextInput({ placeholder: '例如：晨跑 5 公里', text: this.formTitle })
-          .fontColor(Theme.TEXT)
-          .fontSize(14)
-          .backgroundColor(Theme.INPUT_BG)
-          .borderRadius(10)
-          .border({ width: 1, color: Theme.BORDER })
+          .placeholderColor($r('sys.color.font_tertiary'))
+          .fontColor($r('sys.color.font_primary'))
+          .fontSize(AppFont.Body)
+          .backgroundColor($r('sys.color.comp_background_tertiary'))
+          .borderRadius(AppRadius.Md)
           .height(42)
           .align(Alignment.Start)
           .onChange((value: string) => {
             this.formTitle = value
           })
 
-        Text('强度').fontSize(12).fontColor(Theme.TEXT_SUB).margin({ top: 12, bottom: 6 })
+        Text('强度').fontSize(AppFont.Caption).fontColor($r('sys.color.font_secondary')).margin({ top: 12, bottom: 6 })
         OptionChips({
           options: ['低强度', '中等强度', '高强度'],
           selected: this.formIntensityIndex,
@@ -501,27 +490,26 @@ export struct WorkoutPage {
           }
         })
 
-        Text('训练日期').fontSize(12).fontColor(Theme.TEXT_SUB).margin({ top: 12, bottom: 6 })
+        Text('训练日期').fontSize(AppFont.Caption).fontColor($r('sys.color.font_secondary')).margin({ top: 12, bottom: 6 })
         Text(this.formDate)
-          .fontSize(14)
-          .fontColor(Theme.CYAN)
+          .fontSize(AppFont.Body)
+          .fontColor(AppColor.Brand)
           .width('100%')
           .height(42)
           .padding({ left: 12 })
-          .borderRadius(10)
-          .backgroundColor(Theme.INPUT_BG)
-          .border({ width: 1, color: Theme.BORDER })
+          .borderRadius(AppRadius.Md)
+          .backgroundColor($r('sys.color.comp_background_tertiary'))
           .onClick(() => {
             this.pickDate()
           })
 
-        Text('备注（可选）').fontSize(12).fontColor(Theme.TEXT_SUB).margin({ top: 12, bottom: 6 })
+        Text('备注（可选）').fontSize(AppFont.Caption).fontColor($r('sys.color.font_secondary')).margin({ top: 12, bottom: 6 })
         TextInput({ placeholder: '身体感受、配速等', text: this.formNote })
-          .fontColor(Theme.TEXT)
-          .fontSize(13)
-          .backgroundColor(Theme.INPUT_BG)
-          .borderRadius(10)
-          .border({ width: 1, color: Theme.BORDER })
+          .placeholderColor($r('sys.color.font_tertiary'))
+          .fontColor($r('sys.color.font_primary'))
+          .fontSize(AppFont.Body)
+          .backgroundColor($r('sys.color.comp_background_tertiary'))
+          .borderRadius(AppRadius.Md)
           .height(40)
           .align(Alignment.Start)
           .onChange((value: string) => {

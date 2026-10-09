@@ -1,0 +1,30 @@
+# HarmonyOS 代码混淆规则（release 构建生效）
+# 对应 entry/build-profile.json5 的 release buildOptionSet。
+
+# ─── 启用混淆 ───
+-enable-property-obfuscation
+-enable-toplevel-obfuscation
+-enable-filename-obfuscation
+-enable-export-obfuscation
+
+# 名称缓存（增量构建）
+-enable-name-cache
+-print-namecache obfuscation-cache.json
+
+# ─── 保留 JSON 序列化属性名 ───
+# 经 JSON.parse / JSON.stringify 读写的属性名无法被静态追踪，
+# 业务代码中出现这类字段时（本地持久化、备份文件、外部 JSON 协议），在此逐行补充；
+# 仅通过 Preferences / 资源字符串访问的键不受属性混淆影响。
+# -keep-property-name
+#   fieldName
+#   anotherField
+
+# ─── 保留全局名称 ───
+# -keep-global-name
+#   globalFunctionName
+
+# ─── 保留文件名 ───
+# -enable-filename-obfuscation 已启用；如某些按字符串路径动态加载的文件被混淆后失效，
+# 可在此保留，或注释掉上面的 -enable-filename-obfuscation。
+# -keep-file-name
+#   someFile

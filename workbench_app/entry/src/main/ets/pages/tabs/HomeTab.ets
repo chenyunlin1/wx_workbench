@@ -1,9 +1,11 @@
 import { Fmt, toast } from '../../common/AppKit'
 import { Api } from '../../api/Api'
-import { Session } from '../../store/Session'
+import { Session, SessionStore } from '../../store/Session'
 import { Theme } from '../../common/Theme'
+import { AppColor, AppFont, AppSpace } from '../../theme/Theme'
+import { WindowUtils } from '../../utils/WindowUtils'
 import { DashboardSummary, Habit, Interview, Schedule, ShoppingItem } from '../../model/Models'
-import { EmptyView, SectionTitle, StatTile, TechCard } from '../../components/Ui'
+import { SectionTitle, StatTile, TechCard } from '../../components/Ui'
 
 class FeatureEntry {
   icon: string = ''
@@ -32,21 +34,29 @@ const ENTRIES: FeatureEntry[] = [
 const SECTION_GAP: number = 16
 const TILE_GAP: number = 10
 
-@Component
+@ComponentV2
 export struct HomeTab {
-  @Consume('topInset') topInset: number
-  @Consume('nav') nav: NavPathStack
-  @StorageLink('dataVersion') @Watch('reload') version: number = 0
-  @State summary: DashboardSummary | null = null
-  @State refreshing: boolean = false
-  @State todaySchedules: Schedule[] = []
+  @Param nav: NavPathStack = new NavPathStack();
+  @Event onScrollerReady: (scroller: Scroller) => void = () => {};
+  @Local session: SessionStore = Session;
+  @Local summary: DashboardSummary | null = null;
+  @Local refreshing: boolean = false;
+  @Local todaySchedules: Schedule[] = [];
+
+  private scroller: Scroller = new Scroller();
 
   aboutToAppear(): void {
-    this.reload()
+    this.onScrollerReady(this.scroller);
+    this.reload();
   }
 
-  reload(): void {
-    Api.getDashboard().then((data) => {
+  @Monitor('session.dataVersion')
+  onDataVersionChange(): void {
+    this.reload();
+  }
+
+  private reload(): void {
+    Api.getDashboard().then((data: DashboardSummary) => {
       this.summary = data
       const today = Fmt.today()
       const list: Schedule[] = []
@@ -64,7 +74,7 @@ export struct HomeTab {
     })
   }
 
-  greeting(): string {
+  private greeting(): string {
     const hour = new Date().getHours()
     if (hour < 6) {
       return '夜深了'
@@ -81,13 +91,14 @@ export struct HomeTab {
     return '晚上好'
   }
 
-  @Builder todayScheduleRow(item: Schedule) {
+  @Builder
+  todayScheduleRow(item: Schedule) {
     Row({ space: 10 }) {
       Column() {
         Text(Fmt.timeOnly(item.startTime))
           .fontSize(13)
           .fontWeight(FontWeight.Bold)
-          .fontColor(Theme.CYAN)
+          .fontColor(AppColor.Brand)
       }
       .width(52)
       Column()
@@ -97,21 +108,21 @@ export struct HomeTab {
         .backgroundColor(Theme.priorityColor(item.priority))
       Column({ space: 2 }) {
         Text(item.title)
-          .fontSize(14)
-          .fontColor(item.completed ? Theme.TEXT_FAINT : Theme.TEXT)
+          .fontSize(AppFont.Body)
+          .fontColor(item.completed ? $r('sys.color.font_tertiary') : $r('sys.color.font_primary'))
           .decoration({ type: item.completed ? TextDecorationType.LineThrough : TextDecorationType.None })
           .maxLines(1)
           .textOverflow({ overflow: TextOverflow.Ellipsis })
         Text(item.category + ' · ' + Theme.priorityLabel(item.priority) + '优先')
           .fontSize(11)
-          .fontColor(Theme.TEXT_FAINT)
+          .fontColor($r('sys.color.font_tertiary'))
       }
       .alignItems(HorizontalAlign.Start)
       .layoutWeight(1)
       if (item.completed) {
         Text('已完成')
           .fontSize(10)
-          .fontColor(Theme.MINT)
+          .fontColor(AppColor.Brand)
       }
     }
     .width('100%')
@@ -119,252 +130,6 @@ export struct HomeTab {
     .onClick(() => {
       this.nav.pushPathByName('schedules', null)
     })
-  }
-
-  build() {
-    Stack() {
-      Refresh({ refreshing: $$this.refreshing }) {
-        Scroll() {
-          Column({ space: SECTION_GAP }) {
-            // 顶部问候
-            Row({ space: 12 }) {
-              Column({ space: 3 }) {
-                Text(Fmt.today() + ' · ' + Fmt.weekday(Fmt.today()))
-                  .fontSize(11)
-                  .fontColor(Theme.TEXT_FAINT)
-                Text(this.greeting() + '，' + Session.username())
-                  .fontSize(20)
-                  .fontWeight(FontWeight.Bold)
-                  .fontColor(Theme.TEXT)
-              }
-              .alignItems(HorizontalAlign.Start)
-              .layoutWeight(1)
-              Text(Session.username().substring(0, 1).toUpperCase())
-                .fontSize(18)
-                .fontWeight(FontWeight.Bold)
-                .fontColor('#FFFFFF')
-                .width(42)
-                .height(42)
-                .textAlign(TextAlign.Center)
-                .borderRadius(21)
-                .linearGradient({ angle: 135, colors: Theme.BRAND_COLORS })
-            }
-            .width('100%')
-
-            // 今日核心指标：每块指标点对应功能页，和下方「全部功能」格子一致
-            Column({ space: TILE_GAP }) {
-              Row({ space: TILE_GAP }) {
-                StatTile({
-                  weighted: true,
-                  icon: '📅',
-                  value: this.summary === null ? '-' : this.todaySchedules.length.toString() + ' 项',
-                  label: '今日日程',
-                  accent: Theme.CYAN,
-                  onTile: (): void => {
-                    this.nav.pushPathByName('schedules', null)
-                  }
-                })
-                StatTile({
-                  weighted: true,
-                  icon: '✅',
-                  value: this.summary === null ? '-' :
-                  this.summary.habits.filter((h: Habit) => h.checkedToday).length.toString() + '/' +
-                  this.summary.habits.length.toString(),
-                  label: '习惯打卡',
-                  accent: Theme.MINT,
-                  onTile: (): void => {
-                    this.nav.pushPathByName('habits', null)
-                  }
-                })
-              }
-              .width('100%')
-              Row({ space: TILE_GAP }) {
-                StatTile({
-                  weighted: true,
-                  icon: '📚',
-                  value: this.summary === null ? '-' : this.summary.learning.todayDuration + ' 分钟',
-                  label: '今日学习',
-                  accent: Theme.VIOLET,
-                  onTile: (): void => {
-                    this.nav.pushPathByName('practice', null)
-                  }
-                })
-                StatTile({
-                  weighted: true,
-                  icon: '💼',
-                  value: this.summary === null ? '-' :
-                  this.summary.interviews.filter((i: Interview) => i.status === 'pending').length.toString() + ' 场',
-                  label: '待进行面试',
-                  accent: Theme.WARN,
-                  onTile: (): void => {
-                    this.nav.pushPathByName('interviews', null)
-                  }
-                })
-              }
-              .width('100%')
-            }
-            .width('100%')
-
-            // 本月财务
-            Column() {
-              SectionTitle({ title: '本月收支' })
-              TechCard({ onCard: (): void => {
-                this.nav.pushPathByName('finance', null)
-              } }) {
-                Row() {
-                  Column({ space: 4 }) {
-                    Text('收入')
-                      .fontSize(11)
-                      .fontColor(Theme.TEXT_SUB)
-                    Text('+' + (this.summary === null ? '-' : Fmt.moneyShort(this.summary.finance.income)))
-                      .fontSize(17)
-                      .fontWeight(FontWeight.Bold)
-                      .fontColor(Theme.SUCCESS)
-                  }
-                  .layoutWeight(1)
-                  .alignItems(HorizontalAlign.Center)
-                  Column({ space: 4 }) {
-                    Text('支出')
-                      .fontSize(11)
-                      .fontColor(Theme.TEXT_SUB)
-                    Text('-' + (this.summary === null ? '-' : Fmt.moneyShort(this.summary.finance.expense)))
-                      .fontSize(17)
-                      .fontWeight(FontWeight.Bold)
-                      .fontColor(Theme.DANGER)
-                  }
-                  .layoutWeight(1)
-                  .alignItems(HorizontalAlign.Center)
-                  Column({ space: 4 }) {
-                    Text('结余')
-                      .fontSize(11)
-                      .fontColor(Theme.TEXT_SUB)
-                    Text(this.summary === null ? '-' : Fmt.moneyShort(this.summary.finance.balance))
-                      .fontSize(17)
-                      .fontWeight(FontWeight.Bold)
-                      .fontColor(Theme.CYAN)
-                  }
-                  .layoutWeight(1)
-                  .alignItems(HorizontalAlign.Center)
-                }
-                .width('100%')
-              }
-            }
-            .width('100%')
-
-            // 今日日程
-            Column() {
-              SectionTitle({ title: '今日日程' })
-              if (this.todaySchedules.length === 0) {
-                Text('今天没有安排，好好休息 🍵')
-                  .fontSize(12)
-                  .fontColor(Theme.TEXT_FAINT)
-                  .width('100%')
-                  .padding({ top: 8, bottom: 8 })
-              } else {
-                ForEach(this.todaySchedules.slice(0, 4), (item: Schedule) => {
-                  this.todayScheduleRow(item)
-                }, (item: Schedule) => item.id.toString())
-                if (this.todaySchedules.length > 4) {
-                  Text('还有 ' + (this.todaySchedules.length - 4) + ' 条，点击查看全部 →')
-                    .fontSize(11)
-                    .fontColor(Theme.CYAN)
-                    .margin({ top: 6 })
-                    .onClick(() => {
-                      this.nav.pushPathByName('schedules', null)
-                    })
-                }
-              }
-            }
-            .width('100%')
-
-            // 体重与待买（合并为一张卡片）
-            TechCard() {
-              Row({ space: 14 }) {
-                Column({ space: 6 }) {
-                  Text('⚖️ 最新体重')
-                    .fontSize(11)
-                    .fontColor(Theme.TEXT_SUB)
-                  Text(this.latestWeightText())
-                    .fontSize(18)
-                    .fontWeight(FontWeight.Bold)
-                    .fontColor(Theme.MINT)
-                  Text(this.sevenDayAverageText())
-                    .fontSize(10)
-                    .fontColor(Theme.TEXT_FAINT)
-                }
-                .alignItems(HorizontalAlign.Start)
-                .layoutWeight(1)
-                .onClick(() => {
-                  this.nav.pushPathByName('habits', null)
-                })
-                Divider()
-                  .vertical(true)
-                  .height(46)
-                  .color(Theme.BORDER)
-                Column({ space: 6 }) {
-                  Text('🛒 待买清单')
-                    .fontSize(11)
-                    .fontColor(Theme.TEXT_SUB)
-                  Text(this.pendingCountText())
-                    .fontSize(18)
-                    .fontWeight(FontWeight.Bold)
-                    .fontColor(Theme.WARN)
-                  Text(this.pendingShoppingNames())
-                    .fontSize(10)
-                    .fontColor(Theme.TEXT_FAINT)
-                    .maxLines(1)
-                    .textOverflow({ overflow: TextOverflow.Ellipsis })
-                }
-                .alignItems(HorizontalAlign.Start)
-                .layoutWeight(1)
-                .onClick(() => {
-                  this.nav.pushPathByName('shopping', null)
-                })
-              }
-              .width('100%')
-              .alignItems(VerticalAlign.Top)
-            }
-
-            // 功能入口
-            Column() {
-              SectionTitle({ title: '全部功能' })
-              GridRow({ columns: 4, gutter: TILE_GAP }) {
-                ForEach(ENTRIES, (entry: FeatureEntry) => {
-                  GridCol({ span: 1 }) {
-                    Column({ space: 8 }) {
-                      Text(entry.icon)
-                        .fontSize(30)
-                      Text(entry.label)
-                        .fontSize(11)
-                        .fontColor(Theme.TEXT)
-                        .maxLines(1)
-                    }
-                    .width('100%')
-                    .padding({ top: 10, bottom: 10 })
-                    .onClick(() => {
-                      this.nav.pushPathByName(entry.target, null)
-                    })
-                  }
-                }, (entry: FeatureEntry) => entry.target)
-              }
-              .width('100%')
-            }
-            .width('100%')
-          }
-          .padding({ left: 16, right: 16, top: this.topInset + 12, bottom: SECTION_GAP + 4 })
-          .constraintSize({ minHeight: '100%' })
-        }
-        .scrollBar(BarState.Off)
-        .edgeEffect(EdgeEffect.Spring)
-        .width('100%')
-        .height('100%')
-      }
-      .onRefreshing(() => {
-        this.reload()
-      })
-    }
-    .width('100%')
-    .height('100%')
   }
 
   private latestWeightText(): string {
@@ -402,5 +167,256 @@ export struct HomeTab {
       names.push(item.name)
     }
     return names.join('、')
+  }
+
+  build() {
+    Stack() {
+      Refresh({ refreshing: $$this.refreshing }) {
+        Scroll(this.scroller) {
+          Column({ space: SECTION_GAP }) {
+            // 顶部问候
+            Row({ space: AppSpace.Sm }) {
+              Column({ space: 3 }) {
+                Text(Fmt.today() + ' · ' + Fmt.weekday(Fmt.today()))
+                  .fontSize(11)
+                  .fontColor($r('sys.color.font_tertiary'))
+                Text(this.greeting() + '，' + Session.username())
+                  .fontSize(AppFont.TitleL)
+                  .fontWeight(FontWeight.Bold)
+                  .fontColor($r('sys.color.font_primary'))
+              }
+              .alignItems(HorizontalAlign.Start)
+              .layoutWeight(1)
+              Text(Session.username().substring(0, 1).toUpperCase())
+                .fontSize(AppFont.Title)
+                .fontWeight(FontWeight.Bold)
+                .fontColor(AppColor.OnBrand)
+                .width(42)
+                .height(42)
+                .textAlign(TextAlign.Center)
+                .borderRadius(21)
+                .backgroundColor(AppColor.Brand)
+            }
+            .width('100%')
+
+            // 今日核心指标：每块指标点对应功能页，和下方「全部功能」格子一致
+            Column({ space: TILE_GAP }) {
+              Row({ space: TILE_GAP }) {
+                StatTile({
+                  weighted: true,
+                  icon: '📅',
+                  value: this.summary === null ? '-' : this.todaySchedules.length.toString() + ' 项',
+                  label: '今日日程',
+                  accent: AppColor.Brand,
+                  onTile: (): void => {
+                    this.nav.pushPathByName('schedules', null)
+                  }
+                })
+                StatTile({
+                  weighted: true,
+                  icon: '✅',
+                  value: this.summary === null ? '-' :
+                  this.summary.habits.filter((h: Habit) => h.checkedToday).length.toString() + '/' +
+                  this.summary.habits.length.toString(),
+                  label: '习惯打卡',
+                  accent: AppColor.BrandDark,
+                  onTile: (): void => {
+                    this.nav.pushPathByName('habits', null)
+                  }
+                })
+              }
+              .width('100%')
+              Row({ space: TILE_GAP }) {
+                StatTile({
+                  weighted: true,
+                  icon: '📚',
+                  value: this.summary === null ? '-' : this.summary.learning.todayDuration + ' 分钟',
+                  label: '今日学习',
+                  accent: AppColor.Brand,
+                  onTile: (): void => {
+                    this.nav.pushPathByName('practice', null)
+                  }
+                })
+                StatTile({
+                  weighted: true,
+                  icon: '💼',
+                  value: this.summary === null ? '-' :
+                  this.summary.interviews.filter((i: Interview) => i.status === 'pending').length.toString() + ' 场',
+                  label: '待进行面试',
+                  accent: Theme.WARN,
+                  onTile: (): void => {
+                    this.nav.pushPathByName('interviews', null)
+                  }
+                })
+              }
+              .width('100%')
+            }
+            .width('100%')
+
+            // 本月财务
+            Column() {
+              SectionTitle({ title: '本月收支' })
+              TechCard({ onCard: (): void => {
+                this.nav.pushPathByName('finance', null)
+              } }) {
+                Row() {
+                  Column({ space: 4 }) {
+                    Text('收入')
+                      .fontSize(11)
+                      .fontColor($r('sys.color.font_secondary'))
+                    Text('+' + (this.summary === null ? '-' : Fmt.moneyShort(this.summary.finance.income)))
+                      .fontSize(17)
+                      .fontWeight(FontWeight.Bold)
+                      .fontColor(Theme.SUCCESS)
+                  }
+                  .layoutWeight(1)
+                  .alignItems(HorizontalAlign.Center)
+                  Column({ space: 4 }) {
+                    Text('支出')
+                      .fontSize(11)
+                      .fontColor($r('sys.color.font_secondary'))
+                    Text('-' + (this.summary === null ? '-' : Fmt.moneyShort(this.summary.finance.expense)))
+                      .fontSize(17)
+                      .fontWeight(FontWeight.Bold)
+                      .fontColor(Theme.DANGER)
+                  }
+                  .layoutWeight(1)
+                  .alignItems(HorizontalAlign.Center)
+                  Column({ space: 4 }) {
+                    Text('结余')
+                      .fontSize(11)
+                      .fontColor($r('sys.color.font_secondary'))
+                    Text(this.summary === null ? '-' : Fmt.moneyShort(this.summary.finance.balance))
+                      .fontSize(17)
+                      .fontWeight(FontWeight.Bold)
+                      .fontColor(AppColor.Brand)
+                  }
+                  .layoutWeight(1)
+                  .alignItems(HorizontalAlign.Center)
+                }
+                .width('100%')
+              }
+            }
+            .width('100%')
+
+            // 今日日程
+            Column() {
+              SectionTitle({ title: '今日日程' })
+              if (this.todaySchedules.length === 0) {
+                Text('今天没有安排，好好休息 🍵')
+                  .fontSize(AppFont.Caption)
+                  .fontColor($r('sys.color.font_tertiary'))
+                  .width('100%')
+                  .padding({ top: AppSpace.Xs, bottom: AppSpace.Xs })
+              } else {
+                ForEach(this.todaySchedules.slice(0, 4), (item: Schedule) => {
+                  this.todayScheduleRow(item)
+                }, (item: Schedule) => item.id.toString())
+                if (this.todaySchedules.length > 4) {
+                  Text('还有 ' + (this.todaySchedules.length - 4) + ' 条，点击查看全部 →')
+                    .fontSize(11)
+                    .fontColor(AppColor.Brand)
+                    .margin({ top: 6 })
+                    .onClick(() => {
+                      this.nav.pushPathByName('schedules', null)
+                    })
+                }
+              }
+            }
+            .width('100%')
+
+            // 体重与待买（合并为一张卡片）
+            TechCard() {
+              Row({ space: 14 }) {
+                Column({ space: 6 }) {
+                  Text('⚖️ 最新体重')
+                    .fontSize(11)
+                    .fontColor($r('sys.color.font_secondary'))
+                  Text(this.latestWeightText())
+                    .fontSize(AppFont.Title)
+                    .fontWeight(FontWeight.Bold)
+                    .fontColor(AppColor.Brand)
+                  Text(this.sevenDayAverageText())
+                    .fontSize(10)
+                    .fontColor($r('sys.color.font_tertiary'))
+                }
+                .alignItems(HorizontalAlign.Start)
+                .layoutWeight(1)
+                .onClick(() => {
+                  this.nav.pushPathByName('habits', null)
+                })
+                Divider()
+                  .vertical(true)
+                  .height(46)
+                  .color(Theme.BORDER)
+                Column({ space: 6 }) {
+                  Text('🛒 待买清单')
+                    .fontSize(11)
+                    .fontColor($r('sys.color.font_secondary'))
+                  Text(this.pendingCountText())
+                    .fontSize(AppFont.Title)
+                    .fontWeight(FontWeight.Bold)
+                    .fontColor(Theme.WARN)
+                  Text(this.pendingShoppingNames())
+                    .fontSize(10)
+                    .fontColor($r('sys.color.font_tertiary'))
+                    .maxLines(1)
+                    .textOverflow({ overflow: TextOverflow.Ellipsis })
+                }
+                .alignItems(HorizontalAlign.Start)
+                .layoutWeight(1)
+                .onClick(() => {
+                  this.nav.pushPathByName('shopping', null)
+                })
+              }
+              .width('100%')
+              .alignItems(VerticalAlign.Top)
+            }
+
+            // 功能入口
+            Column() {
+              SectionTitle({ title: '全部功能' })
+              GridRow({ columns: 4, gutter: TILE_GAP }) {
+                ForEach(ENTRIES, (entry: FeatureEntry) => {
+                  GridCol({ span: 1 }) {
+                    Column({ space: AppSpace.Xs }) {
+                      Text(entry.icon)
+                        .fontSize(30)
+                      Text(entry.label)
+                        .fontSize(11)
+                        .fontColor($r('sys.color.font_primary'))
+                        .maxLines(1)
+                    }
+                    .width('100%')
+                    .padding({ top: 10, bottom: 10 })
+                    .onClick(() => {
+                      this.nav.pushPathByName(entry.target, null)
+                    })
+                  }
+                }, (entry: FeatureEntry) => entry.target)
+              }
+              .width('100%')
+            }
+            .width('100%')
+          }
+          .padding({
+            left: AppSpace.Md,
+            right: AppSpace.Md,
+            top: WindowUtils.getStatusBarHeightVp() + 12,
+            bottom: WindowUtils.getFloatingTabBottomVp()
+          })
+          .constraintSize({ minHeight: '100%' })
+        }
+        .scrollBar(BarState.Off)
+        .edgeEffect(EdgeEffect.Spring)
+        .width('100%')
+        .height('100%')
+      }
+      .onRefreshing(() => {
+        this.reload()
+      })
+    }
+    .width('100%')
+    .height('100%')
   }
 }

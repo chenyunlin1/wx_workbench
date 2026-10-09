@@ -1,12 +1,29 @@
 /node_modules
 /oh_modules
+**/oh_modules/
 /local.properties
 /.idea
 **/build
 /.hvigor
+**/.hvigor/
 .cxx
 /.clangd
 /.clang-format
 /.clang-tidy
 **/.test
 /.appanalyzer
+
+# 构建产物与预览缓存
+/obfuscation-cache.json
+/preview
+**/.preview/
+
+# 本地签名与产物
+/signing/
+/*.hap
+/artifacts/
+
+# 日志与临时目录
+*.log
+build-logs/
+/tmp/

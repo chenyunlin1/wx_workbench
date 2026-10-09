@@ -1,117 +1,80 @@
-import { AbilityConstant, Configuration, ConfigurationConstant, UIAbility, Want } from '@kit.AbilityKit';
+import { ConfigurationConstant, Configuration, UIAbility } from '@kit.AbilityKit';
 import { hilog } from '@kit.PerformanceAnalysisKit';
-import { window, display } from '@kit.ArkUI';
+import { window } from '@kit.ArkUI';
+import { WindowUtils } from '../utils/WindowUtils';
+import { PreferenceService } from '../service/PreferenceService';
 import { Session } from '../store/Session';
-import { Theme } from '../common/Theme';
 
 const DOMAIN = 0x0000;
+const TAG = 'EntryAbility';
 
 export default class EntryAbility extends UIAbility {
-  private mainWindow: window.Window | null = null;
-
-  onCreate(want: Want, launchParam: AbilityConstant.LaunchParam): void {
-    hilog.info(DOMAIN, 'testTag', '%{public}s', 'Ability onCreate');
-    // 初始化会话：加载 Token / 用户 / 服务器地址
+  onCreate(): void {
+    // 会话（Token / 用户 / 服务器地址）必须在首屏渲染前就绪
     Session.init(this.context);
-    // 探测系统深浅色模式（通过 base/dark 资源探针取值）
-    this.detectColorMode();
+    this.syncColorMode(this.context.config.colorMode);
+    // 偏好库必须早于首页读取：恢复上次保存的深浅色模式。
+    PreferenceService.init(this.context)
+      .then((): Promise<void> => this.restoreColorMode())
+      .catch((err: Error): void => {
+        hilog.error(DOMAIN, TAG, 'Preference init failed: %{public}s', err?.message ?? JSON.stringify(err));
+      });
   }
 
-  onDestroy(): void {
-    hilog.info(DOMAIN, 'testTag', '%{public}s', 'Ability onDestroy');
+  private async restoreColorMode(): Promise<void> {
+    const mode = await PreferenceService.getColorMode();
+    if (mode !== ConfigurationConstant.ColorMode.COLOR_MODE_NOT_SET) {
+      try {
+        this.context.getApplicationContext().setColorMode(mode);
+      } catch (err) {
+        hilog.error(DOMAIN, TAG, 'Restore colorMode failed: %{public}s', JSON.stringify(err));
+      }
+    }
   }
 
   onWindowStageCreate(windowStage: window.WindowStage): void {
-    // Main window is created, set main page for this ability
-    hilog.info(DOMAIN, 'testTag', '%{public}s', 'Ability onWindowStageCreate');
+    this.loadMainWindow(windowStage).catch((err: Error) => {
+      hilog.error(DOMAIN, TAG, 'Main window load failed: %{public}s', JSON.stringify(err));
+    });
+  }
+
+  onWindowStageRestore(windowStage: window.WindowStage): void {
+    this.loadMainWindow(windowStage).catch((err: Error) => {
+      hilog.error(DOMAIN, TAG, 'Restored window load failed: %{public}s', JSON.stringify(err));
+    });
+  }
+
+  private async loadMainWindow(windowStage: window.WindowStage): Promise<void> {
+    try {
+      await WindowUtils.setupImmersive(windowStage, this.context.config.colorMode);
+    } catch (err) {
+      hilog.error(DOMAIN, TAG, 'Immersive setup failed: %{public}s', JSON.stringify(err));
+    }
 
     windowStage.loadContent('pages/Index', (err) => {
       if (err.code) {
-        hilog.error(DOMAIN, 'testTag', 'Failed to load the content. Cause: %{public}s', JSON.stringify(err));
+        hilog.error(DOMAIN, TAG, 'Failed to load the content. Cause: %{public}s', JSON.stringify(err));
         return;
       }
-      hilog.info(DOMAIN, 'testTag', 'Succeeded in loading the content.');
+      WindowUtils.refreshAvoidArea();
     });
-
-    this.setupImmersiveWindow(windowStage);
-
-    try {
-      this.context.getApplicationContext().setColorMode(ConfigurationConstant.ColorMode.COLOR_MODE_NOT_SET);
-    } catch (err) {
-      hilog.error(DOMAIN, 'testTag', 'Failed to set colorMode. Cause: %{public}s', JSON.stringify(err));
-    }
   }
 
+  /** 系统深浅色切换时，同步状态栏字色，避免深色模式下黑字看不见 */
   onConfigurationUpdate(newConfig: Configuration): void {
-    // 系统深浅色切换：更新主题缓存、窗口背景与系统栏颜色
-    this.detectColorMode();
-    this.applySystemBarTheme();
+    if (newConfig.colorMode !== undefined) {
+      this.syncColorMode(newConfig.colorMode);
+      WindowUtils.updateColorMode(newConfig.colorMode);
+    }
   }
 
   onWindowStageDestroy(): void {
-    hilog.info(DOMAIN, 'testTag', '%{public}s', 'Ability onWindowStageDestroy');
+    WindowUtils.releaseWindow();
   }
 
-  onForeground(): void {
-    hilog.info(DOMAIN, 'testTag', '%{public}s', 'Ability onForeground');
-  }
-
-  onBackground(): void {
-    hilog.info(DOMAIN, 'testTag', '%{public}s', 'Ability onBackground');
-  }
-
-  /**
-   * 探测当前深浅色：app.color.theme_probe 在 base 中是 #000001、dark 中是 #000002。
-   */
-  private async detectColorMode(): Promise<void> {
-    try {
-      const probe = await this.context.resourceManager.getColorByName('theme_probe');
-      const mode = probe === 2 ? 'dark' : 'light';
-      AppStorage.setOrCreate('colorMode', mode);
-      hilog.info(DOMAIN, 'testTag', 'Color mode detected: %{public}s', mode);
-    } catch (err) {
-      AppStorage.setOrCreate('colorMode', 'dark');
-      hilog.error(DOMAIN, 'testTag', 'Failed to detect color mode: %{public}s', JSON.stringify(err));
-    }
-  }
-
-  /**
-   * 沉浸式全屏：布局延伸到状态栏 / 导航条之下，
-   * 窗口背景与页面背景同为 Theme.BG（纯色无缝），内容按避让高度下移。
-   */
-  private setupImmersiveWindow(windowStage: window.WindowStage): void {
-    try {
-      const win = windowStage.getMainWindowSync();
-      this.mainWindow = win;
-      win.setWindowLayoutFullScreen(true);
-
-      const density = display.getDefaultDisplaySync().densityPixels;
-      const statusBar = win.getWindowAvoidArea(window.AvoidAreaType.TYPE_SYSTEM);
-      const navIndicator = win.getWindowAvoidArea(window.AvoidAreaType.TYPE_NAVIGATION_INDICATOR);
-      AppStorage.setOrCreate('statusBarHeight', Math.ceil(statusBar.topRect.height / density));
-      AppStorage.setOrCreate('navBarHeight', Math.ceil(navIndicator.bottomRect.height / density));
-
-      this.applySystemBarTheme();
-      hilog.info(DOMAIN, 'testTag', 'Immersive window ready. statusBar=%{public}d navBar=%{public}d',
-        AppStorage.get<number>('statusBarHeight') ?? 0, AppStorage.get<number>('navBarHeight') ?? 0);
-    } catch (err) {
-      hilog.error(DOMAIN, 'testTag', 'Failed to setup immersive window: %{public}s', JSON.stringify(err));
-    }
-  }
-
-  private applySystemBarTheme(): void {
-    if (this.mainWindow === null) {
-      return;
-    }
-    try {
-      const contentColor = Theme.isDark() ? '#FFFFFF' : '#17233B';
-      this.mainWindow.setWindowSystemBarProperties({
-        statusBarContentColor: contentColor,
-        navigationBarContentColor: contentColor
-      });
-      this.mainWindow.setWindowBackgroundColor(Theme.BG);
-    } catch (err) {
-      hilog.error(DOMAIN, 'testTag', 'Failed to apply system bar theme: %{public}s', JSON.stringify(err));
-    }
+  /** 兼容层 Theme.isDark() 依赖此键；同时业务页的深浅色手写色值也用它分档 */
+  private syncColorMode(mode: ConfigurationConstant.ColorMode | undefined): void {
+    const isDark: boolean = mode === ConfigurationConstant.ColorMode.COLOR_MODE_DARK;
+    AppStorage.setOrCreate<string>('colorMode', isDark ? 'dark' : 'light');
   }
 }
