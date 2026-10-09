@@ -141,6 +141,8 @@ export struct SheetHeader {
     }
     .width('100%')
     .alignItems(VerticalAlign.Center)
+    // 半模态右上角有系统关闭按钮（showClose 默认 true，不在业务代码里），有右侧操作时为其预留占区
+    .padding({ right: (this.actionLabel.length > 0 || this.actionLabel2.length > 0) ? 48 : 0 })
   }
 }
 
