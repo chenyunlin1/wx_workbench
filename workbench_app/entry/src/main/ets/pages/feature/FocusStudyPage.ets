@@ -613,7 +613,7 @@ export struct FocusStudyPage {
         MiniBar({ ratio: this.cycleRatio() })
       }
       .width('100%')
-      .margin({ top: 6 })
+      .margin({ top: 6, bottom: AppSpace.Sm })
 
       Scroll() {
         Column() {
