@@ -586,11 +586,15 @@ export struct FocusStudyPage {
       }
       .width('100%')
 
-      Row() {
-        this.statCol('本次专注', this.durText(this.elapsedSec), AppColor.Brand)
-        this.statCol('今日累计', this.minPairText(), AppColor.BrandDark)
-        this.statCol('距下一次完成', this.remainText(), this.remainingSec < 0 ? $r('sys.color.font_tertiary') : Theme.WARN)
-      }
+      // 统计、进度与练习卡放进同一个页面级滚动：卡片按文字自然高度渲染、整页一起滚，
+      // 不再单独留一块只能内部滚动的卡片区（顶栏固定，保证出口按钮随时可点）
+      Scroll() {
+        Column() {
+          Row() {
+            this.statCol('本次专注', this.durText(this.elapsedSec), AppColor.Brand)
+            this.statCol('今日累计', this.minPairText(), AppColor.BrandDark)
+            this.statCol('距下一次完成', this.remainText(), this.remainingSec < 0 ? $r('sys.color.font_tertiary') : Theme.WARN)
+          }
       .width('100%')
       .margin({ top: AppSpace.Md })
       .padding({ top: AppSpace.Sm, bottom: AppSpace.Sm })
@@ -615,8 +619,6 @@ export struct FocusStudyPage {
       .width('100%')
       .margin({ top: 6, bottom: AppSpace.Sm })
 
-      Scroll() {
-        Column() {
           if (this.questions.length === 0) {
             TechCard() {
               Column({ space: AppSpace.Xs }) {
@@ -770,6 +772,7 @@ export struct FocusStudyPage {
             .width('100%')
           }
         }
+        .width('100%')
         .padding({ bottom: PAGE_SCROLL_BOTTOM })
         .constraintSize({ minHeight: '100%' })
       }
@@ -782,8 +785,7 @@ export struct FocusStudyPage {
     .padding({
       left: PAGE_PAD_H,
       right: PAGE_PAD_H,
-      top: WindowUtils.getStatusBarHeightVp() + 12,
-      bottom: WindowUtils.getFloatingTabBottomVp()
+      top: WindowUtils.getStatusBarHeightVp() + 12
     })
   }
 
