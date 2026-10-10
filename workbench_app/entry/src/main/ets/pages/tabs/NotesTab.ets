@@ -4,6 +4,7 @@ import { Theme } from '../../common/Theme'
 import { AppColor, AppFont, AppMaterial, AppRadius, AppSpace } from '../../theme/Theme'
 import { WindowUtils } from '../../utils/WindowUtils'
 import { Session, SessionStore } from '../../store/Session'
+import { KnowledgeCacheService } from '../../service/KnowledgeCacheService'
 import { KnowledgeItem, KnowledgePayload } from '../../model/Models'
 import { Chip, EmptyView, OptionChips, PAGE_PAD_H, SHEET_PAD_BOTTOM, SHEET_PAD_TOP, SheetHeader, SheetSubmit, TechCard } from '../../components/Ui'
 
@@ -32,67 +33,96 @@ export struct NotesTab {
   @Local saving: boolean = false;
 
   private scroller: Scroller = new Scroller();
+  private all: KnowledgeItem[] = []
+  private filtered: KnowledgeItem[] = []
+  private visible: number = PAGE_SIZE
 
   aboutToAppear(): void {
     this.onScrollerReady(this.scroller);
-    this.loadTags()
-    this.reload()
+    this.reloadFromCache()
+    // 首次安装或无缓存时自动同步一次，避免空列表
+    if (this.all.length === 0) {
+      this.refreshing = true
+      this.syncFromServer()
+    }
   }
 
   @Monitor('session.dataVersion')
   onDataVersionChange(): void {
-    this.reload()
+    this.reloadFromCache()
   }
 
-  private loadTags(): void {
-    Api.knowledgeTags().then((list: string[]) => {
-      this.tags = list
-    }).catch(() => {
+  private reloadFromCache(): void {
+    this.all = KnowledgeCacheService.load()
+    this.tags = KnowledgeCacheService.tagsOf(this.all)
+    this.applyFilters()
+  }
+
+  private applyFilters(): void {
+    const keyword = this.keyword.trim().toLowerCase()
+    this.filtered = this.all.filter((item: KnowledgeItem) => {
+      if (this.typeIndex === 1 && item.type !== 'note') {
+        return false
+      }
+      if (this.typeIndex === 2 && item.type !== 'qa') {
+        return false
+      }
+      if (this.tagFilter.length > 0 && !item.tags.includes(this.tagFilter)) {
+        return false
+      }
+      if (keyword.length > 0) {
+        const title = item.title.toLowerCase()
+        const content = item.content.toLowerCase()
+        if (!title.includes(keyword) && !content.includes(keyword)) {
+          return false
+        }
+      }
+      return true
     })
+    this.filtered.sort((a: KnowledgeItem, b: KnowledgeItem): number => this.compareItems(a, b))
+    this.total = this.filtered.length
+    this.items = this.filtered.slice(0, this.visible)
   }
 
-  private buildQuery(page: number): Record<string, string> {
-    const query: Record<string, string> = {
-      'page': page.toString(),
-      'pageSize': PAGE_SIZE.toString(),
-      'sortBy': ['updatedAt', 'createdAt', 'views'][this.sortIndex]
+  /** 与服务端排序一致：按当前字段降序，同值按 id 降序保证稳定 */
+  private compareItems(a: KnowledgeItem, b: KnowledgeItem): number {
+    let diff = 0
+    if (this.sortIndex === 2) {
+      diff = b.views - a.views
+    } else {
+      const left = this.sortIndex === 1 ? a.createdAt : a.updatedAt
+      const right = this.sortIndex === 1 ? b.createdAt : b.updatedAt
+      diff = left === right ? 0 : (left < right ? 1 : -1)
     }
-    if (this.keyword.trim().length > 0) {
-      query['keyword'] = this.keyword.trim()
-    }
-    if (this.typeIndex === 1) {
-      query['type'] = 'note'
-    } else if (this.typeIndex === 2) {
-      query['type'] = 'qa'
-    }
-    if (this.tagFilter.length > 0) {
-      query['tag'] = this.tagFilter
-    }
-    return query
+    return diff !== 0 ? diff : b.id - a.id
   }
 
-  private reload(): void {
-    Api.listKnowledge(this.buildQuery(1)).then((result) => {
-      this.items = result.items
-      this.total = result.total
-    }).catch((err: Object) => {
-      toast(err instanceof Error ? err.message : '加载失败')
-    }).finally(() => {
-      this.refreshing = false
-    })
+  /** 筛选条件变化时回到第一页 */
+  private resetViewport(): void {
+    this.visible = PAGE_SIZE
+    this.applyFilters()
   }
 
   private loadMore(): void {
     if (this.items.length >= this.total) {
       return
     }
-    const nextPage = Math.floor(this.items.length / PAGE_SIZE) + 1
-    Api.listKnowledge(this.buildQuery(nextPage)).then((result) => {
-      const merged = this.items.concat(result.items)
-      this.items = merged
-      this.total = result.total
+    this.visible += PAGE_SIZE
+    this.applyFilters()
+  }
+
+  /** 下拉刷新：逐页拉取线上全量覆盖本地缓存 */
+  private syncFromServer(): void {
+    KnowledgeCacheService.syncFromServer().then((list: KnowledgeItem[]) => {
+      this.all = list
+      this.tags = KnowledgeCacheService.tagsOf(list)
+      this.applyFilters()
+      toast('已同步 ' + list.length + ' 条')
     }).catch((err: Object) => {
-      toast(err instanceof Error ? err.message : '加载失败')
+      toast('同步失败：' + (err instanceof Error ? err.message : '请稍后重试'))
+      this.reloadFromCache()
+    }).finally(() => {
+      this.refreshing = false
     })
   }
 
@@ -116,9 +146,10 @@ export struct NotesTab {
   }
 
   private toggleLearned(item: KnowledgeItem): void {
-    Api.updateKnowledge(item.id, { isLearned: !item.isLearned }).then(() => {
+    Api.updateKnowledge(item.id, { isLearned: !item.isLearned }).then((updated: KnowledgeItem) => {
+      KnowledgeCacheService.upsert(updated)
       toast(item.isLearned ? '已标记为未学习' : '已标记为已学习')
-      this.reload()
+      this.reloadFromCache()
     }).catch((err: Object) => {
       toast(err instanceof Error ? err.message : '操作失败')
     })
@@ -126,9 +157,10 @@ export struct NotesTab {
 
   private removeItem(item: KnowledgeItem): void {
     Api.deleteKnowledge(item.id).then(() => {
+      KnowledgeCacheService.remove(item.id)
       toast('已删除')
       this.showSheet = false
-      this.reload()
+      this.reloadFromCache()
     }).catch((err: Object) => {
       toast(err instanceof Error ? err.message : '删除失败')
     })
@@ -157,11 +189,11 @@ export struct NotesTab {
     const call = this.formId === 0
       ? Api.createKnowledge(payload)
       : Api.updateKnowledge(this.formId, payload)
-    call.then(() => {
+    call.then((saved: KnowledgeItem) => {
+      KnowledgeCacheService.upsert(saved)
       toast('已保存')
       this.showSheet = false
-      this.reload()
-      this.loadTags()
+      this.reloadFromCache()
     }).catch((err: Object) => {
       toast(err instanceof Error ? err.message : '保存失败')
     }).finally(() => {
@@ -206,7 +238,7 @@ export struct NotesTab {
                 this.keyword = value
               })
               .onSubmit(() => {
-                this.reload()
+                this.resetViewport()
               })
 
             Row({ space: AppSpace.Xs }) {
@@ -215,7 +247,7 @@ export struct NotesTab {
                 selected: this.typeIndex,
                 onSelect: (index: number) => {
                   this.typeIndex = index
-                  this.reload()
+                  this.resetViewport()
                 }
               })
               OptionChips({
@@ -223,7 +255,7 @@ export struct NotesTab {
                 selected: this.sortIndex,
                 onSelect: (index: number) => {
                   this.sortIndex = index
-                  this.reload()
+                  this.resetViewport()
                 }
               })
             }
@@ -236,7 +268,7 @@ export struct NotesTab {
                   Chip({ text: '全部标签', color: AppColor.Brand, selected: this.tagFilter.length === 0 })
                     .onClick(() => {
                       this.tagFilter = ''
-                      this.reload()
+                      this.resetViewport()
                     })
                   ForEach(this.tags, (tag: string) => {
                     Chip({
@@ -246,7 +278,7 @@ export struct NotesTab {
                     })
                       .onClick(() => {
                         this.tagFilter = this.tagFilter === tag ? '' : tag
-                        this.reload()
+                        this.resetViewport()
                       })
                   }, (tag: string) => tag)
                 }
@@ -345,7 +377,7 @@ export struct NotesTab {
         .height('100%')
       }
       .onRefreshing(() => {
-        this.reload()
+        this.syncFromServer()
       })
     }
     .width('100%')

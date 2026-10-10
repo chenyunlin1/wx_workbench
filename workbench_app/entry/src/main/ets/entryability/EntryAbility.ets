@@ -3,6 +3,7 @@ import { hilog } from '@kit.PerformanceAnalysisKit';
 import { window } from '@kit.ArkUI';
 import { WindowUtils } from '../utils/WindowUtils';
 import { PreferenceService } from '../service/PreferenceService';
+import { KnowledgeCacheService } from '../service/KnowledgeCacheService';
 import { Session } from '../store/Session';
 
 const DOMAIN = 0x0000;
@@ -12,6 +13,8 @@ export default class EntryAbility extends UIAbility {
   onCreate(): void {
     // 会话（Token / 用户 / 服务器地址）必须在首屏渲染前就绪
     Session.init(this.context);
+    // 知识库缓存的目录依赖 context，也在这里先备好
+    KnowledgeCacheService.init(this.context);
     this.syncColorMode(this.context.config.colorMode);
     // 偏好库必须早于首页读取：恢复上次保存的深浅色模式。
     PreferenceService.init(this.context)

@@ -7,6 +7,7 @@ import {
   SchedulePayload,
   WorkoutPayload
 } from '../model/Models'
+import { KnowledgeCacheService } from '../service/KnowledgeCacheService'
 
 /**
  * AI 工具在鸿蒙端的执行器。后端只把模型的工具调用校验成「待确认操作」，
@@ -168,7 +169,8 @@ export async function runAiAction(tool: string, args: Record<string, Object>): P
       if (tags.length > 0) {
         payload.tags = tags.split(',')
       }
-      await Api.createKnowledge(payload)
+      const created = await Api.createKnowledge(payload)
+      KnowledgeCacheService.upsert(created)
       return '知识记录已保存'
     }
 

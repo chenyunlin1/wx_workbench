@@ -3,6 +3,7 @@ import { Api } from '../../api/Api'
 import { Theme } from '../../common/Theme'
 import { AppColor, AppFont, AppMaterial, AppRadius, AppSpace } from '../../theme/Theme'
 import { Session } from '../../store/Session'
+import { KnowledgeCacheService } from '../../service/KnowledgeCacheService'
 import { KnowledgeItem, KnowledgePayload } from '../../model/Models'
 import { Chip, OptionChips, PAGE_PAD_H, PAGE_SCROLL_BOTTOM, PageHeader, SectionTitle, SHEET_PAD_BOTTOM, SHEET_PAD_TOP, SheetHeader, SheetSubmit, TechCard } from '../../components/Ui'
 
@@ -29,10 +30,19 @@ export struct KnowledgeDetailPage {
       this.loading = false
       return
     }
+    // 先用本地缓存立即可见，再拉线上详情（同时刷新浏览量）
+    const cached = KnowledgeCacheService.findById(id)
+    if (cached !== undefined) {
+      this.item = cached
+      this.loading = false
+    }
     Api.knowledgeDetail(id).then((detail: KnowledgeItem) => {
       this.item = detail
+      KnowledgeCacheService.upsert(detail)
     }).catch((err: Object) => {
-      toast(err instanceof Error ? err.message : '加载失败')
+      if (this.item === null) {
+        toast(err instanceof Error ? err.message : '加载失败')
+      }
     }).finally(() => {
       this.loading = false
     })
@@ -64,6 +74,7 @@ export struct KnowledgeDetailPage {
     }
     Api.updateKnowledge(this.item.id, { isLearned: !this.item.isLearned }).then((updated: KnowledgeItem) => {
       this.item = updated
+      KnowledgeCacheService.upsert(updated)
       toast(updated.isLearned ? '已标记为已学习' : '已标记为未学习')
       Session.bumpDataVersion()
     }).catch((err: Object) => {
@@ -108,6 +119,7 @@ export struct KnowledgeDetailPage {
     this.saving = true
     Api.updateKnowledge(this.item.id, payload).then((updated: KnowledgeItem) => {
       this.item = updated
+      KnowledgeCacheService.upsert(updated)
       toast('已保存')
       this.showEdit = false
       Session.bumpDataVersion()
@@ -122,7 +134,9 @@ export struct KnowledgeDetailPage {
     if (this.item === null) {
       return
     }
-    Api.deleteKnowledge(this.item.id).then(() => {
+    const item = this.item
+    Api.deleteKnowledge(item.id).then(() => {
+      KnowledgeCacheService.remove(item.id)
       toast('已删除')
       Session.bumpDataVersion()
       this.nav.pop()
