@@ -77,6 +77,16 @@ export class WindowUtils {
     try { win.minimize().catch((): void => {}); } catch (_e) {}
   }
 
+  /**
+   * 敏感内容（密码查看）防截屏/录屏。
+   * 必须用常驻的主窗口实例：异步新建窗口实例后设置隐私模式不生效。
+   */
+  static setPrivacyMode(on: boolean): void {
+    const win = WindowUtils.mainWindow;
+    if (win === null) return;
+    try { win.setWindowPrivacyMode(on).catch((): void => {}); } catch (_e) {}
+  }
+
   static addSafeAreaListener(listener: (topVp: number, bottomVp: number) => void): void {
     if (WindowUtils.safeAreaListeners.indexOf(listener) < 0) {
       WindowUtils.safeAreaListeners.push(listener);

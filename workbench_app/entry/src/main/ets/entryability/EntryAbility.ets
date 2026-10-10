@@ -4,6 +4,7 @@ import { window } from '@kit.ArkUI';
 import { WindowUtils } from '../utils/WindowUtils';
 import { PreferenceService } from '../service/PreferenceService';
 import { KnowledgeCacheService } from '../service/KnowledgeCacheService';
+import { FocusStudyService } from '../service/FocusStudyService';
 import { Session } from '../store/Session';
 
 const DOMAIN = 0x0000;
@@ -15,6 +16,8 @@ export default class EntryAbility extends UIAbility {
     Session.init(this.context);
     // 知识库缓存的目录依赖 context，也在这里先备好
     KnowledgeCacheService.init(this.context);
+    // 专注学习本地存储：进行中状态落盘，切后台据此计次/作废
+    FocusStudyService.init(this.context);
     this.syncColorMode(this.context.config.colorMode);
     // 偏好库必须早于首页读取：恢复上次保存的深浅色模式。
     PreferenceService.init(this.context)
@@ -73,6 +76,11 @@ export default class EntryAbility extends UIAbility {
 
   onWindowStageDestroy(): void {
     WindowUtils.releaseWindow();
+  }
+
+  /** 切后台/息屏：专注页由此计一次后台并暂停；超过上限本段作废 */
+  onBackground(): void {
+    FocusStudyService.notifyBackground();
   }
 
   /** 兼容层 Theme.isDark() 依赖此键；同时业务页的深浅色手写色值也用它分档 */

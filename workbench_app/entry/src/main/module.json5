@@ -25,6 +25,9 @@
           ],
           "when": "inuse"
         }
+      },
+      {
+        "name": "ohos.permission.PRIVACY_WINDOW"
       }
     ],
     "abilities": [
