@@ -8,7 +8,7 @@ import { LearningTask } from '../../model/Models'
 import { FocusStudyService, FocusTask } from '../../service/FocusStudyService'
 import { KnowledgeCacheService } from '../../service/KnowledgeCacheService'
 import { PasswordRevealSheet } from '../../components/FocusPasswordSheet'
-import { EmptyView, MiniBar, OptionChips, PAGE_PAD_H, SectionTitle, SheetDelete, SHEET_PAD_BOTTOM, SHEET_PAD_TOP, SheetHeader, SheetSubmit, StatTile, TechCard } from '../../components/Ui'
+import { EmptyView, Chip, MiniBar, OptionChips, PAGE_PAD_H, SectionTitle, SheetDelete, SHEET_PAD_BOTTOM, SHEET_PAD_TOP, SheetHeader, SheetSubmit, StatTile, TechCard } from '../../components/Ui'
 
 function statusColor(status: string): ResourceColor {
   if (status === 'doing') {
@@ -49,9 +49,9 @@ export struct LearningTab {
   @Local focusPassword: string = '';
   @Local focusViewSec: string = '60';
   @Local focusModeIndex: number = 0;
-  @Local focusRangeIndex: number = 0;
   @Local focusRanges: string[] = ['all', 'learned', 'unlearned'];
   @Local focusRangeLabels: string[] = ['全部笔记', '已学习笔记', '未学习笔记'];
+  @Local focusRangeSelected: boolean[] = [true];
   @Local focusCountIndex: number = 1;
   @Local showReveal: boolean = false;
   @Local revealPassword: string = '';
@@ -282,12 +282,33 @@ export struct LearningTab {
     this.focusPassword = ''
     this.focusViewSec = '60'
     this.focusModeIndex = 0
-    this.focusRangeIndex = 0
     this.focusCountIndex = 1
     const tags = KnowledgeCacheService.tagsOf(KnowledgeCacheService.load())
     this.focusRanges = ['all', 'learned', 'unlearned'].concat(tags)
     this.focusRangeLabels = ['全部笔记', '已学习笔记', '未学习笔记'].concat(tags)
+    const selected: boolean[] = []
+    for (let i = 0; i < this.focusRanges.length; i += 1) {
+      selected.push(i === 0)
+    }
+    this.focusRangeSelected = selected
     this.showFocusForm = true
+  }
+
+  /** 范围多选：「全部笔记」互斥，选中即清空其它；点其它项则取消「全部」 */
+  private toggleFocusRange(index: number): void {
+    const next: boolean[] = []
+    for (let i = 0; i < this.focusRanges.length; i += 1) {
+      next.push(this.focusRangeSelected[i] === true)
+    }
+    if (index === 0) {
+      for (let i = 0; i < next.length; i += 1) {
+        next[i] = i === 0
+      }
+    } else {
+      next[index] = !next[index]
+      next[0] = false
+    }
+    this.focusRangeSelected = next
   }
 
   private saveFocusForm(): void {
@@ -336,6 +357,16 @@ export struct LearningTab {
       toast('请设置任务密码')
       return
     }
+    const ranges: string[] = []
+    for (let i = 0; i < this.focusRanges.length; i += 1) {
+      if (this.focusRangeSelected[i] === true) {
+        ranges.push(this.focusRanges[i])
+      }
+    }
+    if (ranges.length === 0) {
+      toast('请至少选择一个练习范围')
+      return
+    }
     confirm('创建后所有配置（含密码）不可修改，只能删除重建。确定创建吗？', (): void => {
       FocusStudyService.create({
         name: name,
@@ -345,7 +376,7 @@ export struct LearningTab {
         bgLimit: bgLimit,
         dailyLimit: dailyLimit,
         practiceMode: this.focusModeIndex === 0 ? 'flashcard' : 'fillblank',
-        practiceRange: this.focusRanges[this.focusRangeIndex],
+        practiceRange: ranges.join(','),
         practiceCount: [5, 10, 20, 50][this.focusCountIndex],
         rewardEnabled: rewardEnabled,
         password: rewardEnabled ? password : '',
@@ -885,15 +916,20 @@ export struct LearningTab {
           }
         })
 
-        Text('练习范围').fontSize(AppFont.Caption).fontColor($r('sys.color.font_secondary')).margin({ top: 14, bottom: 6 })
-        OptionChips({
-          options: this.focusRanges,
-          labels: this.focusRangeLabels,
-          selected: this.focusRangeIndex,
-          onSelect: (index: number) => {
-            this.focusRangeIndex = index
-          }
-        })
+        Text('练习范围（可多选）').fontSize(AppFont.Caption).fontColor($r('sys.color.font_secondary')).margin({ top: 14, bottom: 6 })
+        Flex({ wrap: FlexWrap.Wrap }) {
+          ForEach(this.focusRanges, (range: string, index: number) => {
+            Chip({
+              text: this.focusRangeLabels[index],
+              selected: this.focusRangeSelected[index] === true
+            })
+              .margin({ right: AppSpace.Xs, bottom: AppSpace.Xs })
+              .onClick(() => {
+                this.toggleFocusRange(index)
+              })
+          }, (range: string, index: number) => range + '-' + index.toString() + '-' + (this.focusRangeSelected[index] === true ? '1' : '0'))
+        }
+        .width('100%')
 
         Text('题目数量').fontSize(AppFont.Caption).fontColor($r('sys.color.font_secondary')).margin({ top: 14, bottom: 6 })
         OptionChips({

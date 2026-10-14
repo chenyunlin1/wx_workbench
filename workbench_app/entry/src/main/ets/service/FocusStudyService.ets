@@ -26,6 +26,7 @@ export interface FocusTaskInput {
   bgLimit: number
   dailyLimit: number
   practiceMode: string
+  /** 逗号分隔的范围列表：all / learned / unlearned / 标签名，由表单多选生成 */
   practiceRange: string
   practiceCount: number
   rewardEnabled: boolean
@@ -502,22 +503,48 @@ export class FocusStudyService {
   }
 
   private static filterByRange(items: KnowledgeItem[], range: string): KnowledgeItem[] {
-    if (range === 'learned') {
-      return items.filter((item: KnowledgeItem) => item.isLearned)
-    }
-    if (range === 'unlearned') {
-      return items.filter((item: KnowledgeItem) => !item.isLearned)
-    }
     if (range.length === 0 || range === 'all') {
       return items.slice()
     }
-    return items.filter((item: KnowledgeItem) => FocusStudyService.hasTag(item, range))
+    const ranges: string[] = range.split(',')
+    const includesLearned: boolean = ranges.indexOf('learned') >= 0
+    const includesUnlearned: boolean = ranges.indexOf('unlearned') >= 0
+    if (includesLearned && includesUnlearned) {
+      return items.slice()
+    }
+    const tags: string[] = []
+    for (const part of ranges) {
+      if (part === 'all') {
+        return items.slice()
+      }
+      if (part !== 'learned' && part !== 'unlearned' && part.length > 0) {
+        tags.push(part)
+      }
+    }
+    const out: KnowledgeItem[] = []
+    for (const note of items) {
+      if (includesLearned && note.isLearned) {
+        out.push(note)
+        continue
+      }
+      if (includesUnlearned && !note.isLearned) {
+        out.push(note)
+        continue
+      }
+      if (tags.length > 0 && FocusStudyService.hasAnyTag(note, tags)) {
+        out.push(note)
+      }
+    }
+    return out
   }
 
-  private static hasTag(item: KnowledgeItem, range: string): boolean {
+  private static hasAnyTag(item: KnowledgeItem, ranges: string[]): boolean {
     for (const tag of item.tags ?? []) {
-      if (String(tag).includes(range)) {
-        return true
+      const text = String(tag)
+      for (const range of ranges) {
+        if (text.includes(range)) {
+          return true
+        }
       }
     }
     return false
