@@ -1,6 +1,5 @@
 import { common } from '@kit.AbilityKit';
 import { MainPage } from './MainPage';
-import { LearningTab } from './tabs/LearningTab';
 import { LoginPage } from './LoginPage';
 import { SettingsPage } from './SettingsPage';
 import { AppIconPage } from './AppIconPage';
@@ -151,11 +150,6 @@ struct Index {
     } else if (name === 'focusStudy') {
       // 专注页自建 NavDestination（需常驻 onBackPressed 拦截），不包 ProfileMenuDestination
       FocusStudyPage({ nav: this.navStack })
-    } else if (name === 'learning') {
-      // 原「学习」Tab 改为独立功能页，从「全部功能」进入
-      ProfileMenuDestination() {
-        LearningTab({ nav: this.navStack, pageMode: true })
-      }
     } else if (name === 'allFeatures') {
       ProfileMenuDestination() {
         AllFeaturesPage({ nav: this.navStack })

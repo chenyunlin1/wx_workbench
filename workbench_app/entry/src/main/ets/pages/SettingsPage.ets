@@ -36,7 +36,7 @@ const THEME_OPTIONS: ThemeOption[] = [
 const TAB_OPTIONS: TabOption[] = [
   new TabOption(0, $r('app.string.tab_home')),
   new TabOption(1, $r('app.string.tab_notes')),
-  new TabOption(2, $r('app.string.tab_focus')),
+  new TabOption(2, $r('app.string.tab_learning')),
   new TabOption(3, $r('app.string.tab_ai')),
   new TabOption(4, $r('app.string.tab_profile'))
 ];

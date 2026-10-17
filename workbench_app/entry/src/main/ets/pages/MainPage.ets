@@ -7,7 +7,7 @@ import { AppColor, HomeTheme } from '../theme/Theme';
 import { PreferenceService } from '../service/PreferenceService';
 import { HomeTab } from './tabs/HomeTab';
 import { NotesTab } from './tabs/NotesTab';
-import { FocusTab } from './tabs/FocusTab';
+import { LearningTab } from './tabs/LearningTab';
 import { AiTab } from './tabs/AiTab';
 import { ProfilePage } from './ProfilePage';
 
@@ -113,9 +113,12 @@ export struct MainPage {
       .tabBar(this.buildTabBar($r('sys.symbol.bookmark_fill'), $r('app.string.tab_notes')))
 
       TabContent() {
-        FocusTab()
+        LearningTab({
+          nav: this.navStack,
+          onScrollerReady: (scroller: Scroller): void => { this.scrollers.set(2, scroller); }
+        })
       }
-      .tabBar(this.buildTabBar($r('sys.symbol.stopwatch_fill'), $r('app.string.tab_focus')))
+      .tabBar(this.buildTabBar($r('sys.symbol.graduationcap_fill'), $r('app.string.tab_learning')))
 
       TabContent() {
         AiTab({
