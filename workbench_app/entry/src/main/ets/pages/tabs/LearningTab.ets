@@ -775,6 +775,46 @@ export struct LearningTab {
     })
   }
 
+  /** 专注表单两列输入项：field 区分写回哪个状态 */
+  @Builder
+  focusInputField(label: string, placeholder: string, value: string, field: number, numeric: boolean) {
+    Column({ space: 6 }) {
+      Text(label)
+        .fontSize(AppFont.Caption)
+        .fontColor($r('sys.color.font_secondary'))
+        .maxLines(1)
+        .textOverflow({ overflow: TextOverflow.Ellipsis })
+      TextInput({ placeholder: placeholder, text: value })
+        .placeholderColor($r('sys.color.font_tertiary'))
+        .fontColor($r('sys.color.font_primary'))
+        .fontSize(AppFont.Body)
+        .backgroundColor($r('sys.color.comp_background_tertiary'))
+        .borderRadius(AppRadius.Md)
+        .height(42)
+        .align(Alignment.Start)
+        .type(numeric ? InputType.Number : InputType.Normal)
+        .onChange((v: string) => {
+          if (field === 0) {
+            this.focusTarget = v
+          } else if (field === 1) {
+            this.focusMin = v
+          } else if (field === 2) {
+            this.focusVerify = v
+          } else if (field === 3) {
+            this.focusBgLimit = v
+          } else if (field === 4) {
+            this.focusDailyLimit = v
+          } else if (field === 5) {
+            this.focusPassword = v
+          } else {
+            this.focusViewSec = v
+          }
+        })
+    }
+    .alignItems(HorizontalAlign.Start)
+    .layoutWeight(1)
+  }
+
   @Builder
   focusFormBuilder() {
     Scroll() {
@@ -799,75 +839,26 @@ export struct LearningTab {
             this.focusName = value
           })
 
-        Text('每日目标总时长（分钟）').fontSize(AppFont.Caption).fontColor($r('sys.color.font_secondary')).margin({ top: 14, bottom: 6 })
-        TextInput({ placeholder: '例如 120', text: this.focusTarget })
-          .placeholderColor($r('sys.color.font_tertiary'))
-          .fontColor($r('sys.color.font_primary'))
-          .fontSize(AppFont.Body)
-          .backgroundColor($r('sys.color.comp_background_tertiary'))
-          .borderRadius(AppRadius.Md)
-          .height(42)
-          .align(Alignment.Start)
-          .type(InputType.Number)
-          .onChange((value: string) => {
-            this.focusTarget = value
-          })
+        Row({ space: AppSpace.Sm }) {
+          this.focusInputField('每日目标总时长（分钟）', '例如 120', this.focusTarget, 0, true)
+          this.focusInputField('单次最少时长（分钟）', '例如 30', this.focusMin, 1, true)
+        }
+        .width('100%')
+        .margin({ top: 14 })
 
-        Text('单次最少时长（分钟）').fontSize(AppFont.Caption).fontColor($r('sys.color.font_secondary')).margin({ top: 14, bottom: 6 })
-        TextInput({ placeholder: '例如 30', text: this.focusMin })
-          .placeholderColor($r('sys.color.font_tertiary'))
-          .fontColor($r('sys.color.font_primary'))
-          .fontSize(AppFont.Body)
-          .backgroundColor($r('sys.color.comp_background_tertiary'))
-          .borderRadius(AppRadius.Md)
-          .height(42)
-          .align(Alignment.Start)
-          .type(InputType.Number)
-          .onChange((value: string) => {
-            this.focusMin = value
-          })
+        Row({ space: AppSpace.Sm }) {
+          this.focusInputField('验证间隔（分钟）', '例如 5', this.focusVerify, 2, true)
+          this.focusInputField('每段后台次数上限', '例如 3', this.focusBgLimit, 3, true)
+        }
+        .width('100%')
+        .margin({ top: AppSpace.Sm })
 
-        Text('验证间隔（分钟）').fontSize(AppFont.Caption).fontColor($r('sys.color.font_secondary')).margin({ top: 14, bottom: 6 })
-        TextInput({ placeholder: '例如 5，每满该时长出一次算术验证', text: this.focusVerify })
-          .placeholderColor($r('sys.color.font_tertiary'))
-          .fontColor($r('sys.color.font_primary'))
-          .fontSize(AppFont.Body)
-          .backgroundColor($r('sys.color.comp_background_tertiary'))
-          .borderRadius(AppRadius.Md)
-          .height(42)
-          .align(Alignment.Start)
-          .type(InputType.Number)
-          .onChange((value: string) => {
-            this.focusVerify = value
-          })
-
-        Text('每段后台次数上限').fontSize(AppFont.Caption).fontColor($r('sys.color.font_secondary')).margin({ top: 14, bottom: 6 })
-        TextInput({ placeholder: '例如 3，切后台/息屏超过则本段作废', text: this.focusBgLimit })
-          .placeholderColor($r('sys.color.font_tertiary'))
-          .fontColor($r('sys.color.font_primary'))
-          .fontSize(AppFont.Body)
-          .backgroundColor($r('sys.color.comp_background_tertiary'))
-          .borderRadius(AppRadius.Md)
-          .height(42)
-          .align(Alignment.Start)
-          .type(InputType.Number)
-          .onChange((value: string) => {
-            this.focusBgLimit = value
-          })
-
-        Text('每日完成次数上限').fontSize(AppFont.Caption).fontColor($r('sys.color.font_secondary')).margin({ top: 14, bottom: 6 })
-        TextInput({ placeholder: '例如 3，每日累计每满目标时长算完成 1 次', text: this.focusDailyLimit })
-          .placeholderColor($r('sys.color.font_tertiary'))
-          .fontColor($r('sys.color.font_primary'))
-          .fontSize(AppFont.Body)
-          .backgroundColor($r('sys.color.comp_background_tertiary'))
-          .borderRadius(AppRadius.Md)
-          .height(42)
-          .align(Alignment.Start)
-          .type(InputType.Number)
-          .onChange((value: string) => {
-            this.focusDailyLimit = value
-          })
+        Row({ space: AppSpace.Sm }) {
+          this.focusInputField('每日完成次数上限', '例如 3', this.focusDailyLimit, 4, true)
+          Column().layoutWeight(1)
+        }
+        .width('100%')
+        .margin({ top: AppSpace.Sm })
 
         Text('奖励').fontSize(AppFont.Caption).fontColor($r('sys.color.font_secondary')).margin({ top: 14, bottom: 6 })
         OptionChips({
@@ -879,32 +870,12 @@ export struct LearningTab {
         })
 
         if (this.focusRewardIndex === 1) {
-          Text('任务密码').fontSize(AppFont.Caption).fontColor($r('sys.color.font_secondary')).margin({ top: 14, bottom: 6 })
-          TextInput({ placeholder: '每完成一次可获得限时查看机会', text: this.focusPassword })
-            .placeholderColor($r('sys.color.font_tertiary'))
-            .fontColor($r('sys.color.font_primary'))
-            .fontSize(AppFont.Body)
-            .backgroundColor($r('sys.color.comp_background_tertiary'))
-            .borderRadius(AppRadius.Md)
-            .height(42)
-            .align(Alignment.Start)
-            .onChange((value: string) => {
-              this.focusPassword = value
-            })
-
-          Text('密码可看时长（秒）').fontSize(AppFont.Caption).fontColor($r('sys.color.font_secondary')).margin({ top: 14, bottom: 6 })
-          TextInput({ placeholder: '例如 60', text: this.focusViewSec })
-            .placeholderColor($r('sys.color.font_tertiary'))
-            .fontColor($r('sys.color.font_primary'))
-            .fontSize(AppFont.Body)
-            .backgroundColor($r('sys.color.comp_background_tertiary'))
-            .borderRadius(AppRadius.Md)
-            .height(42)
-            .align(Alignment.Start)
-            .type(InputType.Number)
-            .onChange((value: string) => {
-              this.focusViewSec = value
-            })
+          Row({ space: AppSpace.Sm }) {
+            this.focusInputField('任务密码', '输入密码', this.focusPassword, 5, false)
+            this.focusInputField('密码可看时长（秒）', '例如 60', this.focusViewSec, 6, true)
+          }
+          .width('100%')
+          .margin({ top: 14 })
         }
 
         Text('练习模式').fontSize(AppFont.Caption).fontColor($r('sys.color.font_secondary')).margin({ top: 14, bottom: 6 })
@@ -917,18 +888,22 @@ export struct LearningTab {
         })
 
         Text('练习范围（可多选）').fontSize(AppFont.Caption).fontColor($r('sys.color.font_secondary')).margin({ top: 14, bottom: 6 })
-        Flex({ wrap: FlexWrap.Wrap }) {
-          ForEach(this.focusRanges, (range: string, index: number) => {
-            Chip({
-              text: this.focusRangeLabels[index],
-              selected: this.focusRangeSelected[index] === true
-            })
-              .margin({ right: AppSpace.Xs, bottom: AppSpace.Xs })
-              .onClick(() => {
-                this.toggleFocusRange(index)
+        Scroll() {
+          Row({ space: AppSpace.Xs }) {
+            ForEach(this.focusRanges, (range: string, index: number) => {
+              Chip({
+                text: this.focusRangeLabels[index],
+                selected: this.focusRangeSelected[index] === true
               })
-          }, (range: string, index: number) => range + '-' + index.toString() + '-' + (this.focusRangeSelected[index] === true ? '1' : '0'))
+                .onClick(() => {
+                  this.toggleFocusRange(index)
+                })
+            }, (range: string, index: number) => range + '-' + index.toString() + '-' + (this.focusRangeSelected[index] === true ? '1' : '0'))
+          }
         }
+        .scrollable(ScrollDirection.Horizontal)
+        .scrollBar(BarState.Off)
+        .align(Alignment.Start)
         .width('100%')
 
         Text('题目数量').fontSize(AppFont.Caption).fontColor($r('sys.color.font_secondary')).margin({ top: 14, bottom: 6 })
