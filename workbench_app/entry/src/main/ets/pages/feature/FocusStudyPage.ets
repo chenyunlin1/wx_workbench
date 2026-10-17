@@ -463,6 +463,33 @@ export struct FocusStudyPage {
     return this.durText(this.remainingSec)
   }
 
+  private statLabel(kind: number): string {
+    if (kind === 0) {
+      return '本次专注'
+    }
+    return kind === 1 ? '今日累计' : '距下一次完成'
+  }
+
+  private statValue(kind: number): string {
+    if (kind === 0) {
+      return this.durText(this.elapsedSec)
+    }
+    if (kind === 1) {
+      return this.minPairText()
+    }
+    return this.remainText()
+  }
+
+  private statAccent(kind: number): ResourceColor {
+    if (kind === 0) {
+      return AppColor.Brand
+    }
+    if (kind === 1) {
+      return AppColor.BrandDark
+    }
+    return this.remainingSec < 0 ? $r('sys.color.font_tertiary') : Theme.WARN
+  }
+
   build() {
     NavDestination() {
       Stack() {
@@ -591,9 +618,9 @@ export struct FocusStudyPage {
       Scroll() {
         Column() {
           Row() {
-            this.statCol('本次专注', this.durText(this.elapsedSec), AppColor.Brand)
-            this.statCol('今日累计', this.minPairText(), AppColor.BrandDark)
-            this.statCol('距下一次完成', this.remainText(), this.remainingSec < 0 ? $r('sys.color.font_tertiary') : Theme.WARN)
+            this.statCol(0)
+            this.statCol(1)
+            this.statCol(2)
           }
       .width('100%')
       .margin({ top: AppSpace.Md })
@@ -790,15 +817,16 @@ export struct FocusStudyPage {
   }
 
   @Builder
-  statCol(label: string, value: string, accent: ResourceColor) {
+  statCol(kind: number) {
     Column({ space: 4 }) {
-      Text(value)
+      // 状态必须在 Text 的更新闭包内读取，才能随计时每秒刷新（builder 按值传参会冻结）
+      Text(this.statValue(kind))
         .fontSize(AppFont.Title)
         .fontWeight(FontWeight.Bold)
-        .fontColor(accent)
+        .fontColor(this.statAccent(kind))
         .maxLines(1)
         .textOverflow({ overflow: TextOverflow.Ellipsis })
-      Text(label)
+      Text(this.statLabel(kind))
         .fontSize(10)
         .fontColor($r('sys.color.font_secondary'))
     }

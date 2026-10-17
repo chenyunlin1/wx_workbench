@@ -233,12 +233,16 @@ export class FocusStudyService {
       return ''
     }
     let delta = Math.floor((now - active.lastTickAt) / 1000)
-    active.lastTickAt = now
+    // 不足 1 秒不推进也不重置锚点：定时器稍早触发时若重置，亚秒余量每秒被丢弃，秒数可能长期不动
     if (delta <= 0) {
       return ''
     }
     if (delta > 3) {
+      // 间隔过大（熄屏/卡顿）只记 3 秒并丢弃整段间隔
       delta = 3
+      active.lastTickAt = now
+    } else {
+      active.lastTickAt += delta * 1000
     }
     active.elapsedSec += delta
     active.sinceVerifySec += delta
