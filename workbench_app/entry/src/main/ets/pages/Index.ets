@@ -19,6 +19,7 @@ import { ShoppingPage } from './feature/ShoppingPage';
 import { UsersPage } from './feature/UsersPage';
 import { KnowledgeDetailPage } from './feature/KnowledgeDetailPage';
 import { FocusStudyPage } from './feature/FocusStudyPage';
+import { AllFeaturesPage } from './feature/AllFeaturesPage';
 import { ProfileMenuDestination } from '../components/ProfileMenuDestination';
 import { WindowUtils } from '../utils/WindowUtils';
 import { PlatformCompat } from '../utils/PlatformCompat';
@@ -149,6 +150,10 @@ struct Index {
     } else if (name === 'focusStudy') {
       // 专注页自建 NavDestination（需常驻 onBackPressed 拦截），不包 ProfileMenuDestination
       FocusStudyPage({ nav: this.navStack })
+    } else if (name === 'allFeatures') {
+      ProfileMenuDestination() {
+        AllFeaturesPage({ nav: this.navStack })
+      }
     }
   }
 

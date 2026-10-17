@@ -6,29 +6,7 @@ import { AppColor, AppFont, AppSpace } from '../../theme/Theme'
 import { WindowUtils } from '../../utils/WindowUtils'
 import { DashboardSummary, Habit, Interview, Schedule, ShoppingItem } from '../../model/Models'
 import { SectionTitle, StatTile, TechCard } from '../../components/Ui'
-
-class FeatureEntry {
-  icon: string = ''
-  label: string = ''
-  target: string = ''
-
-  constructor(icon: string, label: string, target: string) {
-    this.icon = icon
-    this.label = label
-    this.target = target
-  }
-}
-
-const ENTRIES: FeatureEntry[] = [
-  new FeatureEntry('📅', '日程管理', 'schedules'),
-  new FeatureEntry('✅', '习惯健康', 'habits'),
-  new FeatureEntry('🏋️', '减脂健身', 'workout'),
-  new FeatureEntry('💰', '财务记账', 'finance'),
-  new FeatureEntry('🎬', '书影音收藏', 'collection'),
-  new FeatureEntry('🧠', '知识练习', 'practice'),
-  new FeatureEntry('💼', '面试准备', 'interviews'),
-  new FeatureEntry('🛒', '待买清单', 'shopping')
-]
+import { FEATURE_ENTRIES, FeatureEntry, HOME_FEATURE_LIMIT } from '../../common/Features'
 
 /** 首页竖向节奏：区块之间统一 SECTION_GAP；区块内并列元素（指标块、功能格子）统一 TILE_GAP */
 const SECTION_GAP: number = 16
@@ -394,11 +372,17 @@ export struct HomeTab {
               .alignItems(VerticalAlign.Top)
             }
 
-            // 功能入口
+            // 功能入口：首页只展示前 HOME_FEATURE_LIMIT 个，其余去「全部功能」页
             Column() {
-              SectionTitle({ title: '全部功能' })
+              SectionTitle({
+                title: '全部功能',
+                actionLabel: '更多',
+                onAction: (): void => {
+                  this.nav.pushPathByName('allFeatures', null)
+                }
+              })
               GridRow({ columns: 4, gutter: TILE_GAP }) {
-                ForEach(ENTRIES, (entry: FeatureEntry) => {
+                ForEach(FEATURE_ENTRIES.slice(0, HOME_FEATURE_LIMIT), (entry: FeatureEntry) => {
                   GridCol({ span: 1 }) {
                     Column({ space: AppSpace.Xs }) {
                       Text(entry.icon)

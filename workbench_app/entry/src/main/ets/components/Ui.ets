@@ -48,11 +48,14 @@ export struct TechCard {
   }
 }
 
-/** 区块标题 */
+/** 区块标题：带 actionLabel 时在右端显示轻量动作（如「更多」） */
 @ComponentV2
 export struct SectionTitle {
   @Param title: string = ''
   @Param accent: ResourceColor = AppColor.Brand
+  @Param actionLabel: string = ''
+  @Event onAction: () => void = () => {
+  }
 
   build() {
     Row({ space: AppSpace.Xs }) {
@@ -66,6 +69,15 @@ export struct SectionTitle {
         .fontWeight(FontWeight.Bold)
         .fontColor($r('sys.color.font_primary'))
       Blank()
+      if (this.actionLabel.length > 0) {
+        Text(this.actionLabel)
+          .fontSize(AppFont.Caption + 1)
+          .fontColor(AppColor.Brand)
+          .padding({ left: AppSpace.Xs, top: 4, bottom: 4 })
+          .onClick(() => {
+            this.onAction()
+          })
+      }
     }
     .width('100%')
     .margin({ bottom: AppSpace.Xs })
