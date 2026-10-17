@@ -8,7 +8,7 @@ import { LearningTask } from '../../model/Models'
 import { FocusStudyService, FocusTask } from '../../service/FocusStudyService'
 import { KnowledgeCacheService } from '../../service/KnowledgeCacheService'
 import { PasswordRevealSheet } from '../../components/FocusPasswordSheet'
-import { EmptyView, Chip, MiniBar, OptionChips, PAGE_PAD_H, SectionTitle, SheetDelete, SHEET_PAD_BOTTOM, SHEET_PAD_TOP, SheetHeader, SheetSubmit, StatTile, TechCard } from '../../components/Ui'
+import { EmptyView, Chip, MiniBar, OptionChips, PAGE_PAD_H, PAGE_SCROLL_BOTTOM, PageHeader, SectionTitle, SheetDelete, SHEET_PAD_BOTTOM, SHEET_PAD_TOP, SheetHeader, SheetSubmit, StatTile, TechCard } from '../../components/Ui'
 
 function statusColor(status: string): ResourceColor {
   if (status === 'doing') {
@@ -24,6 +24,8 @@ function statusColor(status: string): ResourceColor {
 export struct LearningTab {
   @Param nav: NavPathStack = new NavPathStack();
   @Event onScrollerReady: (scroller: Scroller) => void = () => {};
+  /** true = 从「全部功能」进入的独立页面：显示返回页头，不预留底部 Tab 高度 */
+  @Param pageMode: boolean = false;
   @Local session: SessionStore = Session;
   @Local tasks: LearningTask[] = [];
   @Local refreshing: boolean = false;
@@ -406,15 +408,22 @@ export struct LearningTab {
           Refresh({ refreshing: $$this.refreshing }) {
         Scroll(this.scroller) {
           Column() {
-            Row() {
-              Text('学习')
-                .fontSize(AppFont.TitleL)
-                .fontWeight(FontWeight.Bold)
-                .fontColor($r('sys.color.font_primary'))
-                .layoutWeight(1)
+            if (this.pageMode) {
+              PageHeader({
+                navStack: this.nav,
+                title: '学习'
+              })
+            } else {
+              Row() {
+                Text('学习')
+                  .fontSize(AppFont.TitleL)
+                  .fontWeight(FontWeight.Bold)
+                  .fontColor($r('sys.color.font_primary'))
+                  .layoutWeight(1)
+              }
+              .width('100%')
+              .margin({ bottom: 14 })
             }
-            .width('100%')
-            .margin({ bottom: 14 })
 
             // 知识练习：本 Tab 的主入口，答题流程在 PracticePage
             Column() {
@@ -659,8 +668,8 @@ export struct LearningTab {
           .padding({
             left: AppSpace.Md,
             right: AppSpace.Md,
-            top: WindowUtils.getStatusBarHeightVp() + 12,
-            bottom: WindowUtils.getFloatingTabBottomVp()
+            top: this.pageMode ? 0 : WindowUtils.getStatusBarHeightVp() + 12,
+            bottom: this.pageMode ? PAGE_SCROLL_BOTTOM : WindowUtils.getFloatingTabBottomVp()
           })
           .constraintSize({ minHeight: '100%' })
         }
