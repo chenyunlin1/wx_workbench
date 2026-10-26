@@ -274,15 +274,7 @@ export struct BrowserPage {
                   this.errorHint = event.error.getErrorInfo();
                 }
               })
-              .onLoadIntercept((event: OnLoadInterceptEvent): boolean => {
-                const url: string = event.data.getRequestUrl();
-                if (BrowserHistoryService.isWebUrl(url) || url.startsWith('about:') || url.startsWith('data:')
-                  || url.startsWith('file:')) {
-                  return false;
-                }
-                toast('已阻止跳转到应用外链接');
-                return true;
-              })
+            // 不做 onLoadIntercept：所有站点/协议一律放行，页内跳转与外部链接交给 WebView 自行处理
           }
           if (this.homeOn) {
             this.startView()
