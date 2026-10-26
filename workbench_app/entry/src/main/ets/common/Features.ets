@@ -19,8 +19,7 @@ export const FEATURE_ENTRIES: FeatureEntry[] = [
   new FeatureEntry('🎬', '书影音收藏', 'collection'),
   new FeatureEntry('🧠', '知识练习', 'practice'),
   new FeatureEntry('💼', '面试准备', 'interviews'),
-  new FeatureEntry('🛒', '待买清单', 'shopping'),
-  new FeatureEntry('🌐', '浏览器', 'browser')
+  new FeatureEntry('🛒', '待买清单', 'shopping')
 ]
 
 /** 首页默认展示的入口数量，其余收进「更多」 */

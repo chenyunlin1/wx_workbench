@@ -5,7 +5,6 @@ import { WindowUtils } from '../utils/WindowUtils';
 import { PreferenceService } from '../service/PreferenceService';
 import { KnowledgeCacheService } from '../service/KnowledgeCacheService';
 import { FocusStudyService } from '../service/FocusStudyService';
-import { BrowserHistoryService } from '../service/BrowserHistoryService';
 import { Session } from '../store/Session';
 
 const DOMAIN = 0x0000;
@@ -19,8 +18,6 @@ export default class EntryAbility extends UIAbility {
     KnowledgeCacheService.init(this.context);
     // 专注学习本地存储：进行中状态落盘，切后台据此计次/作废
     FocusStudyService.init(this.context);
-    // 内置浏览器最近访问：按账号落本地文件
-    BrowserHistoryService.init(this.context);
     this.syncColorMode(this.context.config.colorMode);
     // 偏好库必须早于首页读取：恢复上次保存的深浅色模式。
     PreferenceService.init(this.context)
