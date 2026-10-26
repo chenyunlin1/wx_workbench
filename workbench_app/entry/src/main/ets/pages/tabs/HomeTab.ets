@@ -375,7 +375,7 @@ export struct HomeTab {
             // 功能入口：首页只展示前 HOME_FEATURE_LIMIT 个，其余去「全部功能」页
             Column() {
               SectionTitle({
-                title: '全部功能',
+                title: '常用功能',
                 actionLabel: '更多',
                 onAction: (): void => {
                   this.nav.pushPathByName('allFeatures', null)
