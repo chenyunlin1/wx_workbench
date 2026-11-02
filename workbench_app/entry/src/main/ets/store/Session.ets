@@ -4,6 +4,7 @@ import { User } from '../model/Models'
 import { toast } from '../common/AppKit'
 
 const KEY_TOKEN = 'auth_token'
+const KEY_REFRESH_TOKEN = 'auth_refresh_token'
 const KEY_USER = 'auth_user'
 const KEY_SERVER = 'server_url'
 const PREF_NAME = 'workbench_prefs'
@@ -17,6 +18,8 @@ const PREF_NAME = 'workbench_prefs'
 @ObservedV2
 export class SessionStore {
   @Trace token: string = ''
+  /** 续期令牌：accessToken 过期时用它换一套新令牌，用户不会被打回登录页 */
+  @Trace refreshToken: string = ''
   @Trace user: User | null = null
   @Trace serverUrl: string = 'http://10.0.2.2:3000'
   @Trace dataVersion: number = 0
@@ -25,6 +28,7 @@ export class SessionStore {
   init(context: common.Context): void {
     this.prefs = preferences.getPreferencesSync(context, { name: PREF_NAME })
     this.token = this.prefs.getSync(KEY_TOKEN, '') as string
+    this.refreshToken = this.prefs.getSync(KEY_REFRESH_TOKEN, '') as string
     this.serverUrl = this.prefs.getSync(KEY_SERVER, 'http://10.0.2.2:3000') as string
     const userJson = this.prefs.getSync(KEY_USER, '') as string
     if (userJson.length > 0) {
@@ -66,18 +70,32 @@ export class SessionStore {
     return this.user !== null && this.user.role === 'admin'
   }
 
-  login(token: string, user: User): void {
+  login(token: string, refreshToken: string, user: User): void {
     this.token = token
+    this.refreshToken = refreshToken
     this.user = user
     this.writeString(KEY_TOKEN, token)
+    this.writeString(KEY_REFRESH_TOKEN, refreshToken)
     this.writeString(KEY_USER, JSON.stringify(user))
+  }
+
+  /** 续期成功：换新 accessToken，服务端发了新 refreshToken 才一起换 */
+  setTokens(accessToken: string, refreshToken: string): void {
+    this.token = accessToken
+    this.writeString(KEY_TOKEN, accessToken)
+    if (refreshToken.length > 0) {
+      this.refreshToken = refreshToken
+      this.writeString(KEY_REFRESH_TOKEN, refreshToken)
+    }
   }
 
   /** 登录过期 / 主动退出 */
   logout(expired: boolean): void {
     this.token = ''
+    this.refreshToken = ''
     this.user = null
     this.writeString(KEY_TOKEN, '')
+    this.writeString(KEY_REFRESH_TOKEN, '')
     this.writeString(KEY_USER, '')
     if (expired) {
       toast('登录已过期，请重新登录')

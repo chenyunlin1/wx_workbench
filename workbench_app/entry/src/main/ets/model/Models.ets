@@ -14,6 +14,8 @@ export interface User {
 
 export interface LoginResult {
   accessToken: string
+  /** 续期令牌（后端未升级时可能缺失，缺失就不做无感刷新） */
+  refreshToken?: string | null
   user: User
 }
 

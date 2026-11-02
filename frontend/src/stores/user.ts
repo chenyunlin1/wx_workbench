@@ -1,6 +1,6 @@
 import { defineStore } from 'pinia'
 import { getProfile, login as loginApi, updateProfile as updateProfileApi } from '@/api/auth'
-import { getToken, removeToken, setToken } from '@/api'
+import { getToken, removeRefreshToken, removeToken, setRefreshToken, setToken } from '@/api'
 import type { User } from '@/types'
 
 const USER_KEY = 'life-workbench-user'
@@ -30,6 +30,7 @@ export const useUserStore = defineStore('user', {
       this.token = result.accessToken
       this.user = result.user
       setToken(result.accessToken)
+      if (result.refreshToken) setRefreshToken(result.refreshToken)
       localStorage.setItem(USER_KEY, JSON.stringify(result.user))
       return result
     },
@@ -48,6 +49,7 @@ export const useUserStore = defineStore('user', {
       this.token = ''
       this.user = null
       removeToken()
+      removeRefreshToken()
       localStorage.removeItem(USER_KEY)
     },
   },

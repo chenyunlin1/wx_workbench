@@ -19,6 +19,9 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
   }
 
   async validate(payload: JwtPayload) {
+    // 刷新令牌只能走 /auth/refresh，拿它当 Bearer 访问业务接口一律拒绝
+    if (payload.type === 'refresh') throw new UnauthorizedException('登录状态已失效')
+
     const user = await this.usersService.findById(payload.sub)
     if (!user) throw new UnauthorizedException('登录状态已失效')
     return user

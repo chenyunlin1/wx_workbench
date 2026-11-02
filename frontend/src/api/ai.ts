@@ -1,4 +1,4 @@
-import { API_BASE_URL, getToken, removeToken, request } from './index'
+import { API_BASE_URL, clearSessionAndGoLogin, getToken, hasRefreshToken, refreshAccessToken, request } from './index'
 import { parseSseChunk, parseSseFrame, type SseFrame } from '@/utils/sse'
 import type {
   AiChatAction,
@@ -154,21 +154,36 @@ export const streamAiChat = async (
   signal?: AbortSignal,
 ) => {
   const token = getToken()
-  let response: Response
 
-  try {
-    response = await fetch(`${API_BASE_URL}/ai/chat/stream`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        ...(token ? { Authorization: `Bearer ${token}` } : {}),
-      },
-      body: JSON.stringify(data),
-      signal,
-    })
-  } catch (error) {
-    if (error instanceof DOMException && error.name === 'AbortError') throw error
-    throw new Error('无法连接到 AI 服务，请检查后端是否已启动')
+  const open = async (bearer: string | null): Promise<Response> => {
+    try {
+      return await fetch(`${API_BASE_URL}/ai/chat/stream`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(bearer ? { Authorization: `Bearer ${bearer}` } : {}),
+        },
+        body: JSON.stringify(data),
+        signal,
+      })
+    } catch (error) {
+      if (error instanceof DOMException && error.name === 'AbortError') throw error
+      throw new Error('无法连接到 AI 服务，请检查后端是否已启动')
+    }
+  }
+
+  let response = await open(token)
+
+  // 流式请求走原生 fetch，拿不到 axios 拦截器的重放，这里自己续期后重发一次
+  if (response.status === 401 && hasRefreshToken()) {
+    let nextToken: string
+    try {
+      nextToken = await refreshAccessToken()
+    } catch {
+      clearSessionAndGoLogin()
+      throw new Error('登录已过期，请重新登录')
+    }
+    response = await open(nextToken)
   }
 
   if (!response.ok) {
@@ -181,9 +196,7 @@ export const streamAiChat = async (
     }
 
     if (response.status === 401) {
-      removeToken()
-      localStorage.removeItem('life-workbench-user')
-      if (location.pathname !== '/login') location.href = '/login'
+      clearSessionAndGoLogin()
     }
 
     throw new Error(message)

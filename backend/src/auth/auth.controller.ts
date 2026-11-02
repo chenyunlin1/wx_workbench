@@ -6,6 +6,7 @@ import type { User } from '../entities'
 import { UpdateProfileDto } from '../users/dto/update-profile.dto'
 import { AuthService } from './auth.service'
 import { LoginDto } from './dto/login.dto'
+import { RefreshTokenDto } from './dto/refresh-token.dto'
 
 @ApiTags('认证')
 @Controller('auth')
@@ -17,6 +18,13 @@ export class AuthController {
   @ApiOperation({ summary: '账号密码登录' })
   login(@Body() dto: LoginDto) {
     return this.authService.login(dto)
+  }
+
+  @Public()
+  @Post('refresh')
+  @ApiOperation({ summary: '用 refreshToken 无感换发新的 accessToken（会话续期）' })
+  refresh(@Body() dto: RefreshTokenDto) {
+    return this.authService.refresh(dto.refreshToken)
   }
 
   @Get('profile')

@@ -144,6 +144,8 @@ export interface DashboardSummary {
 
 export interface LoginResult {
   accessToken: string
+  /** 会话续期令牌；后端未升级时可能缺失，此时按原逻辑到期重新登录 */
+  refreshToken?: string
   user: User
 }
 export type KnowledgeType = 'note' | 'qa'

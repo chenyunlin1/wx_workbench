@@ -58,15 +58,69 @@ interface ErrorBody {
   message?: string
 }
 
+interface RefreshPayload {
+  refreshToken: string
+}
+
+interface RefreshData {
+  accessToken?: string
+  refreshToken?: string
+}
+
+/** 登录与续期接口的 401 不能触发续期，否则密码错误会变成死循环 */
+function isAuthPath(path: string): boolean {
+  return path === '/auth/login' || path === '/auth/refresh'
+}
+
 /**
  * 统一 HTTP 客户端：
  * - 自动拼接 baseUrl 与 /api 前缀
- * - 自动携带 Bearer Token，已登录时 401 清除会话回登录页
+ * - 自动携带 Bearer Token；accessToken 过期时先用 refreshToken 静默续期再重放一次，
+ *   只有续期也失败（或后端没有续期接口）才清除会话回登录页
  * - 统一解包 { code, message, data } 响应
  * 说明：鸿蒙 HttpMethod 枚举不含 PATCH，后端已为所有 PATCH 路由补充了 PUT 别名。
  */
 export class Http {
+  /** 并发请求同时撞上 401 时只发一次续期请求，其余复用同一个 Promise */
+  private static refreshing: Promise<boolean> | null = null
+
   static async request<T>(method: string, path: string, query?: Record<string, string>,
+    body?: Object | null, timeoutMs?: number): Promise<T> {
+    try {
+      return await Http.sendOnce<T>(method, path, query, body, timeoutMs)
+    } catch (err) {
+      if (!(err instanceof ApiError)) {
+        throw new ApiError('网络连接异常，请检查服务器地址与网络', -1)
+      }
+      if (err.status !== 401) {
+        throw err
+      }
+      // 登录接口自己的 401（密码错误等）原样透出服务端消息
+      if (isAuthPath(path)) {
+        throw err
+      }
+      if (Session.refreshToken.length === 0) {
+        throw Http.expireSession()
+      }
+      if (!await Http.refreshOnce()) {
+        throw Http.expireSession()
+      }
+      // 续期成功，重放一次；再 401 说明服务端已不认这套会话
+      try {
+        return await Http.sendOnce<T>(method, path, query, body, timeoutMs)
+      } catch (retryErr) {
+        if (retryErr instanceof ApiError) {
+          if (retryErr.status === 401) {
+            throw Http.expireSession()
+          }
+          throw retryErr
+        }
+        throw new ApiError('网络连接异常，请检查服务器地址与网络', -1)
+      }
+    }
+  }
+
+  private static async sendOnce<T>(method: string, path: string, query?: Record<string, string>,
     body?: Object | null, timeoutMs?: number): Promise<T> {
     const url = Session.serverUrl.replace(/\/+$/, '') + '/api' + path + buildQuery(query)
     const timeout = timeoutMs === undefined ? 15000 : timeoutMs
@@ -90,6 +144,77 @@ export class Http {
         throw err
       }
       throw new ApiError('网络连接异常，请检查服务器地址与网络', -1)
+    } finally {
+      client.destroy()
+    }
+  }
+
+  /** 会话确认救不回来：清 Token 回登录页（未登录状态不动会话） */
+  private static expireSession(): ApiError {
+    if (Session.token.length > 0) {
+      Session.logout(true)
+    }
+    return new ApiError('登录已过期，请重新登录', 401)
+  }
+
+  private static async refreshOnce(): Promise<boolean> {
+    const pending = Http.refreshing
+    if (pending !== null) {
+      return await pending
+    }
+    const task = Http.renewTokens()
+    Http.refreshing = task
+    const ok = await task
+    if (Http.refreshing === task) {
+      Http.refreshing = null
+    }
+    return ok
+  }
+
+  /** 用 refreshToken 换一套新令牌；任何失败都只返回 false，交由调用方回登录页 */
+  private static async renewTokens(): Promise<boolean> {
+    const url = Session.serverUrl.replace(/\/+$/, '') + '/api/auth/refresh'
+    const payload: RefreshPayload = { refreshToken: Session.refreshToken }
+    const headers: Record<string, string> = {
+      'Content-Type': 'application/json'
+    }
+    const client = http.createHttp()
+    try {
+      const options: http.HttpRequestOptions = {
+        method: http.RequestMethod.POST,
+        header: headers,
+        expectDataType: http.HttpDataType.STRING,
+        connectTimeout: 15000,
+        readTimeout: 15000,
+        extraData: JSON.stringify(payload)
+      }
+      const response = await client.request(url, options)
+      if (response.responseCode !== 200 && response.responseCode !== 201) {
+        return false
+      }
+      const raw = (response.result ?? '') as string
+      let envelope: ApiEnvelope<RefreshData>
+      try {
+        envelope = JSON.parse(raw) as ApiEnvelope<RefreshData>
+      } catch (err) {
+        return false
+      }
+      if (envelope.code !== 0) {
+        return false
+      }
+      const data = envelope.data
+      if (data === undefined || data === null) {
+        return false
+      }
+      const accessToken = data.accessToken
+      if (accessToken === undefined || accessToken === null || accessToken.length === 0) {
+        return false
+      }
+      const refreshToken = data.refreshToken
+      Session.setTokens(accessToken, refreshToken === undefined || refreshToken === null ? '' : refreshToken)
+      return true
+    } catch (err) {
+      return false
     } finally {
       client.destroy()
     }
@@ -122,13 +247,7 @@ export class Http {
       throw new ApiError(envelope.message.length > 0 ? envelope.message : '请求失败', status)
     }
 
-    // 401 仅在携带 token（已登录）时才视为会话过期；登录接口本身返回的 401
-    // （密码错误等）落到下方通用解析，透出服务端真实消息
-    if (status === 401 && Session.token.length > 0) {
-      Session.logout(true)
-      throw new ApiError('登录已过期，请重新登录', 401)
-    }
-
+    // 401 交给 request() 决定是续期重放还是回登录页，这里只透出状态
     let message = '请求失败（' + status + '）'
     try {
       const errBody = JSON.parse(raw) as ErrorBody

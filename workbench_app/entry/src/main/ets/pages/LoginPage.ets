@@ -23,7 +23,9 @@ export struct LoginPage {
     this.loading = true
     try {
       const result = await Api.login(this.username, this.password)
-      Session.login(result.accessToken, result.user)
+      const refreshToken: string = result.refreshToken === undefined || result.refreshToken === null
+        ? '' : result.refreshToken
+      Session.login(result.accessToken, refreshToken, result.user)
       toast('欢迎回来，' + result.user.username)
     } catch (err) {
       const msg = err instanceof Error ? err.message : '登录失败'
