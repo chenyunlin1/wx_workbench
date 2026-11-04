@@ -6,14 +6,19 @@
  * 前端/app 只访问我们自己的 /map/tile 路径。
  */
 
-/** 图层代号 → 天地图 WMTS 的服务图层（layer 参数）与瓦片路径 */
+/**
+ * 图层代号 → 天地图 WMTS 的服务图层（layer 参数）与瓦片路径。
+ *
+ * 注记层用的是 cia_w / cva_w / cta_w（影像/矢量/地形注记，里面是中文路名）；
+ * img_c_w 那套是「中文注记服务」，属于另一个产品，Key 没开通会回 403。
+ */
 export const TIANDITU_LAYERS: Record<string, { path: string; layer: string }> = {
   img: { path: 'img_w', layer: 'img' },
-  img_c: { path: 'img_c_w', layer: 'img_c' },
+  img_c: { path: 'cia_w', layer: 'cia' },
   vec: { path: 'vec_w', layer: 'vec' },
-  vec_c: { path: 'vec_c_w', layer: 'vec_c' },
+  vec_c: { path: 'cva_w', layer: 'cva' },
   ter: { path: 'ter_w', layer: 'ter' },
-  ter_c: { path: 'ter_c_w', layer: 'ter_c' },
+  ter_c: { path: 'cta_w', layer: 'cta' },
 }
 
 /** t0~t7 是同一份内容的不同域名，分摊浏览器/服务端并发上限 */

@@ -19,6 +19,12 @@ const FIT_PAD: number = 52
 const PANEL_H: number = 236
 /** 悬浮按钮的边长 */
 const FLOAT_BTN: number = 40
+/**
+ * 瓦片 URL 的版本号。
+ * ArkUI 的 Image 缓存按完整 URL 走，服务端换了瓦片内容（比如占位图从红色改成透明）
+ * 之后老 URL 会一直命中旧缓存，必须换 URL 才能让手机重新拉。
+ */
+const TILE_VERSION: number = 2
 
 class TilePos {
   tx: number = 0
@@ -127,7 +133,7 @@ export struct RunDetailPage {
   /* ---------------- 瓦片与坐标换算 ---------------- */
 
   private tileUrl(layer: string, tx: number, ty: number): string {
-    return `${Session.serverUrl}/api/map/tile/${layer}/${this.zoom}/${tx}/${ty}`
+    return `${Session.serverUrl}/api/map/tile/${layer}/${this.zoom}/${tx}/${ty}?v=${TILE_VERSION}`
   }
 
   private baseLayer(): string {
@@ -271,7 +277,7 @@ export struct RunDetailPage {
     }
     // 先描一条深色底线，影像底图上黄色线才不会糊掉
     ctx.lineWidth = 6
-    ctx.strokeStyle = 'rgba(0,0,0,0.30)'
+    ctx.strokeStyle = 'rgba(0,0,0,0.45)'
     ctx.stroke()
     ctx.lineWidth = 3.5
     ctx.strokeStyle = RunStyle.TRACK
@@ -339,6 +345,10 @@ export struct RunDetailPage {
           .hitTestBehavior(HitTestMode.None)
           .onReady(() => {
             this.tryFit()
+            this.draw()
+          })
+          // 画布真正拿到尺寸前 onReady 可能先到，那时画什么都没有；尺寸定下来后重画一次
+          .onAreaChange((_oldValue: Area, _newValue: Area) => {
             this.draw()
           })
       }
