@@ -34,8 +34,11 @@ export const TILE_UPSTREAM_CONCURRENCY = 6
 /** 单个来源 IP 一分钟最多取多少张瓦片 */
 export const TILE_RATE_LIMIT_PER_MINUTE = 900
 
-/** 底图取不到时的占位瓦片：1px 透明 PNG，缩放到格子上就是一块空白 */
+/**
+ * 底图取不到时的占位瓦片：1px 全透明 PNG（RGBA 0,0,0,0）。
+ * 必须是真透明——半透明红色会在影像上糊一层红底。
+ */
 export const PLACEHOLDER_PNG = Buffer.from(
-  'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==',
+  'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAAC0lEQVR4nGNgAAIAAAUAAXpeqz8AAAAASUVORK5CYII=',
   'base64',
 )

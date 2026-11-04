@@ -1,6 +1,6 @@
 import { toast } from '../../common/AppKit'
 import { Api } from '../../api/Api'
-import { RunFmt, RunStyle } from '../../common/Running'
+import { MapGeo, RunFmt, RunStyle } from '../../common/Running'
 import { AppColor, AppFont, AppRadius, AppSpace } from '../../theme/Theme'
 import { CorosStatus, RunItem, RunListResult, RunMonth } from '../../model/Models'
 import { EmptyView, PAGE_PAD_H, PAGE_SCROLL_BOTTOM, PageHeader, PillButton, TechCard } from '../../components/Ui'
@@ -31,29 +31,29 @@ struct TrackThumb {
 
     let minLon = pts[0][0]
     let maxLon = pts[0][0]
-    let minLat = pts[0][1]
-    let maxLat = pts[0][1]
+    let minV = MapGeo.mercV(pts[0][1])
+    let maxV = minV
     for (const point of pts) {
       minLon = Math.min(minLon, point[0])
       maxLon = Math.max(maxLon, point[0])
-      minLat = Math.min(minLat, point[1])
-      maxLat = Math.max(maxLat, point[1])
+      const v = MapGeo.mercV(point[1])
+      minV = Math.min(minV, v)
+      maxV = Math.max(maxV, v)
     }
 
-    // 下限避免单点或极短轨迹把整条线拉满格子；纬度取反是因为屏幕向下为正
-    const pad = 8
+    // 下限避免单点或极短轨迹把整条线拉满格子
+    const pad = 10
     const spanLon = Math.max(maxLon - minLon, 0.0004)
-    const spanLat = Math.max(maxLat - minLat, 0.0004)
-    const scale = Math.min((width - pad * 2) / spanLon, (height - pad * 2) / spanLat)
+    // 纵向用墨卡托比例，和详情页的底图同一套投影，否则低纬度处的路会被横向拉长
+    const spanV = Math.max(maxV - minV, 0.0002)
+    const scale = Math.min((width - pad * 2) / spanLon, (height - pad * 2) / spanV)
     const offsetX = (width - spanLon * scale) / 2
-    const offsetY = (height - spanLat * scale) / 2
+    const offsetY = (height - spanV * scale) / 2
     const xOf = (lon: number): number => offsetX + (lon - minLon) * scale
-    const yOf = (lat: number): number => offsetY + (maxLat - lat) * scale
+    const yOf = (lat: number): number => offsetY + (maxV - MapGeo.mercV(lat)) * scale
 
-    ctx.lineWidth = 2
     ctx.lineJoin = 'round'
     ctx.lineCap = 'round'
-    ctx.strokeStyle = RunStyle.TRACK
     ctx.beginPath()
     for (let index = 0; index < pts.length; index += 1) {
       const x = xOf(pts[index][0])
@@ -64,6 +64,12 @@ struct TrackThumb {
         ctx.lineTo(x, y)
       }
     }
+    // 浅底卡片上黄色线不显眼，先垫一条白边
+    ctx.lineWidth = 4
+    ctx.strokeStyle = '#FFFFFFFF'
+    ctx.stroke()
+    ctx.lineWidth = 2
+    ctx.strokeStyle = RunStyle.TRACK
     ctx.stroke()
 
     ctx.fillStyle = RunStyle.START

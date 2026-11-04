@@ -40,6 +40,8 @@ export class TileProxyService {
   private readonly cache = new Map<string, CacheEntry>()
   private readonly inflight = new Map<string, Promise<TileHit>>()
   private readonly buckets = new Map<string, { tokens: number; at: number }>()
+  /** 上游明确说「这个图层没授权」的图层：短期内直接回透明瓦片，不再打上游 */
+  private readonly deniedLayers = new Map<string, number>()
   private cachedBytes = 0
   private active = 0
   private readonly queue: Array<() => void> = []
@@ -68,6 +70,9 @@ export class TileProxyService {
 
     if (!this.allow(clientIp)) return this.placeholder()
 
+    const deniedUntil = this.deniedLayers.get(rawLayer)
+    if (deniedUntil && deniedUntil > Date.now()) return this.placeholder()
+
     const key = `${rawLayer}/${zoom}/${x}/${y}`
     const hit = this.cache.get(key)
     if (hit && hit.until > Date.now()) {
@@ -81,7 +86,7 @@ export class TileProxyService {
     const pending = this.inflight.get(key)
     if (pending) return pending
 
-    const task = this.fetchTile(layer, zoom, x, y, key)
+    const task = this.fetchTile(layer, zoom, x, y, key, rawLayer)
     this.inflight.set(key, task)
     try {
       return await task
@@ -90,7 +95,14 @@ export class TileProxyService {
     }
   }
 
-  private async fetchTile(spec: { path: string; layer: string }, zoom: number, x: number, y: number, key: string) {
+  private async fetchTile(
+    spec: { path: string; layer: string },
+    zoom: number,
+    x: number,
+    y: number,
+    key: string,
+    rawLayer: string,
+  ) {
     const token = this.config.get<string>('TIANDITU_KEY', '').trim()
     const host = `t${(x + y) % TIANDITU_HOSTS}`
     const url =
@@ -111,10 +123,15 @@ export class TileProxyService {
 
       const bytes = Buffer.from(await response.arrayBuffer())
       if (!response.ok || bytes.length < 100) {
+        const reason = (bytes.subarray(0, 200).toString('utf8').match(/"msg":"([^"]{1,60})"/) ?? [])[1] ?? ''
+        // 「没有 xxx/wmts 权限」= 这个 Key 没开这个图层服务，短期内所有请求都是一样的结果
+        if (reason.includes('权限')) {
+          this.deniedLayers.set(rawLayer, Date.now() + TILE_FAILURE_TTL_MS)
+          this.logger.warn(`天地图图层 ${rawLayer} 未开通（${reason}），该图层先不请求上游`)
+        }
         if (!this.warned) {
           this.warned = true
           // 天地图失败基本都是 Key 问题，回体里写着原因（IP 不在白名单 / 非法 key），抄出来省得猜
-          const reason = (bytes.subarray(0, 200).toString('utf8').match(/"msg":"([^"]{1,60})"/) ?? [])[1]
           this.logger.warn(
             `天地图瓦片获取失败（HTTP ${response.status}${reason ? `：${reason}` : ''}），底图留白但轨迹照常显示`,
           )
