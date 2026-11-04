@@ -76,7 +76,6 @@ export struct RunDetailPage {
   @Local pinch: number = 1;
   @Local viewW: number = 0;
   @Local viewH: number = 0;
-  private mapCtx: CanvasRenderingContext2D = new CanvasRenderingContext2D();
   private fitted: boolean = false;
 
   aboutToAppear(): void {
@@ -106,7 +105,9 @@ export struct RunDetailPage {
       } else {
         this.points = track.points
         this.marks = track.kmMarks
-        this.bbox = track.bbox === null ? [] : track.bbox
+        this.bbox = track.bbox === null || track.bbox.length < 4
+          ? this.bboxOf(track.points)
+          : track.bbox
       }
     }).catch((err: Object) => {
       this.noteText = err instanceof Error ? err.message : '记录详情加载失败'
@@ -128,6 +129,24 @@ export struct RunDetailPage {
     rows.push(new RunMetric('平均功率', activity.avgPower === null ? '-' : activity.avgPower.toString(), 'W'))
     rows.push(new RunMetric('运动表现', activity.performance === null ? '-' : activity.performance))
     return rows
+  }
+
+  /** 服务端没给 bbox 时自己算一份，全览才有依据 */
+  private bboxOf(points: RunTrackPoint[]): number[] {
+    if (points.length === 0) {
+      return []
+    }
+    let minLon: number = Infinity
+    let minLat: number = Infinity
+    let maxLon: number = -Infinity
+    let maxLat: number = -Infinity
+    for (const point of points) {
+      minLon = Math.min(minLon, point.lon)
+      maxLon = Math.max(maxLon, point.lon)
+      minLat = Math.min(minLat, point.lat)
+      maxLat = Math.max(maxLat, point.lat)
+    }
+    return [minLon, minLat, maxLon, maxLat]
   }
 
   /* ---------------- 瓦片与坐标换算 ---------------- */
@@ -209,7 +228,6 @@ export struct RunDetailPage {
     this.dragY = 0
     this.pinch = 1
     this.rebuildTiles()
-    this.draw()
   }
 
   /** 把视口中心放到指定经纬度的固定层级（没有轨迹时退回起点定位） */
@@ -245,7 +263,6 @@ export struct RunDetailPage {
     this.pinch = 1
     this.clampCenter()
     this.rebuildTiles()
-    this.draw()
   }
 
   private commitDrag(): void {
@@ -255,70 +272,21 @@ export struct RunDetailPage {
     this.dragY = 0
     this.clampCenter()
     this.rebuildTiles()
-    this.draw()
   }
 
   /* ---------------- 轨迹绘制 ---------------- */
 
-  private draw(): void {
-    const ctx = this.mapCtx
-    ctx.clearRect(0, 0, ctx.width, ctx.height)
-    const pts = this.points
-    if (pts.length < 2) {
-      return
+  /**
+   * 轨迹顶点的屏幕坐标。
+   * 早先用 Canvas 画线，但 Canvas 在 onReady / onAreaChange 时会被清空，
+   * 轨迹画上去就会被抹掉；改成声明式 Polyline 后随状态自动重绘。
+   */
+  private trackPolyline(): number[][] {
+    const vertices: number[][] = []
+    for (const point of this.points) {
+      vertices.push([this.screenX(point.lon), this.screenY(point.lat)])
     }
-
-    ctx.lineJoin = 'round'
-    ctx.lineCap = 'round'
-    ctx.beginPath()
-    ctx.moveTo(this.screenX(pts[0].lon), this.screenY(pts[0].lat))
-    for (let index = 1; index < pts.length; index += 1) {
-      ctx.lineTo(this.screenX(pts[index].lon), this.screenY(pts[index].lat))
-    }
-    // 先描一条深色底线，影像底图上黄色线才不会糊掉
-    ctx.lineWidth = 6
-    ctx.strokeStyle = 'rgba(0,0,0,0.45)'
-    ctx.stroke()
-    ctx.lineWidth = 3.5
-    ctx.strokeStyle = RunStyle.TRACK
-    ctx.stroke()
-
-    for (const mark of this.marks) {
-      const x = this.screenX(mark.lon)
-      const y = this.screenY(mark.lat)
-      if (x < -20 || y < -20 || x > ctx.width + 20 || y > ctx.height + 20) {
-        continue
-      }
-      ctx.beginPath()
-      ctx.arc(x, y, 9, 0, Math.PI * 2)
-      ctx.fillStyle = RunStyle.MARK_FILL
-      ctx.fill()
-      ctx.lineWidth = 1
-      ctx.strokeStyle = RunStyle.MARK_EDGE
-      ctx.stroke()
-      ctx.fillStyle = RunStyle.MARK_TEXT
-      ctx.font = '11px sans-serif'
-      ctx.textAlign = 'center'
-      ctx.textBaseline = 'middle'
-      ctx.fillText(mark.km.toString(), x, y)
-    }
-
-    this.drawEndpoint(pts[0].lon, pts[0].lat, RunStyle.START)
-    const last = pts[pts.length - 1]
-    this.drawEndpoint(last.lon, last.lat, RunStyle.END)
-  }
-
-  private drawEndpoint(lon: number, lat: number, color: string): void {
-    const ctx = this.mapCtx
-    const x = this.screenX(lon)
-    const y = this.screenY(lat)
-    ctx.beginPath()
-    ctx.arc(x, y, 6, 0, Math.PI * 2)
-    ctx.fillStyle = color
-    ctx.fill()
-    ctx.lineWidth = 2
-    ctx.strokeStyle = '#FFFFFF'
-    ctx.stroke()
+    return vertices
   }
 
   build() {
@@ -339,18 +307,63 @@ export struct RunDetailPage {
             .position({ x: tile.tx * TILE - this.shiftX(), y: tile.ty * TILE - this.shiftY() })
         }, (tile: TilePos) => 'c' + this.zoom + '/' + tile.tx + '/' + tile.ty)
 
-        Canvas(this.mapCtx)
-          .width('100%')
-          .height('100%')
-          .hitTestBehavior(HitTestMode.None)
-          .onReady(() => {
-            this.tryFit()
-            this.draw()
-          })
-          // 画布真正拿到尺寸前 onReady 可能先到，那时画什么都没有；尺寸定下来后重画一次
-          .onAreaChange((_oldValue: Area, _newValue: Area) => {
-            this.draw()
-          })
+        // 轨迹层：声明式形状，随状态变化自动重绘（Canvas 会被清空，轨迹会消失）
+        if (this.points.length >= 2) {
+          // 先描一条深色底线，影像底图上黄色线才不会糊掉
+          Polyline({ width: this.viewW, height: this.viewH })
+            .points(this.trackPolyline())
+            .stroke('#00000073')
+            .strokeWidth(8)
+            .strokeLineCap(LineCapStyle.Round)
+            .strokeLineJoin(LineJoinStyle.Round)
+            .position({ x: 0, y: 0 })
+            .hitTestBehavior(HitTestMode.None)
+
+          Polyline({ width: this.viewW, height: this.viewH })
+            .points(this.trackPolyline())
+            .stroke(RunStyle.TRACK)
+            .strokeWidth(4)
+            .strokeLineCap(LineCapStyle.Round)
+            .strokeLineJoin(LineJoinStyle.Round)
+            .position({ x: 0, y: 0 })
+            .hitTestBehavior(HitTestMode.None)
+
+          ForEach(this.marks, (mark: RunKmMark) => {
+            Stack() {
+              Circle({ width: 20, height: 20 })
+                .fill(RunStyle.MARK_FILL)
+                .stroke(RunStyle.MARK_EDGE)
+                .strokeWidth(1)
+              Text(mark.km.toString())
+                .fontSize(11)
+                .fontColor(RunStyle.MARK_TEXT)
+            }
+            .width(20)
+            .height(20)
+            .position({ x: this.screenX(mark.lon) - 10, y: this.screenY(mark.lat) - 10 })
+            .hitTestBehavior(HitTestMode.None)
+          }, (mark: RunKmMark) => mark.km.toString())
+
+          Circle({ width: 14, height: 14 })
+            .fill(RunStyle.START)
+            .stroke('#FFFFFF')
+            .strokeWidth(2)
+            .position({
+              x: this.screenX(this.points[0].lon) - 7,
+              y: this.screenY(this.points[0].lat) - 7
+            })
+            .hitTestBehavior(HitTestMode.None)
+
+          Circle({ width: 14, height: 14 })
+            .fill(RunStyle.END)
+            .stroke('#FFFFFF')
+            .strokeWidth(2)
+            .position({
+              x: this.screenX(this.points[this.points.length - 1].lon) - 7,
+              y: this.screenY(this.points[this.points.length - 1].lat) - 7
+            })
+            .hitTestBehavior(HitTestMode.None)
+        }
       }
       .width('100%')
       .height('100%')
@@ -360,7 +373,6 @@ export struct RunDetailPage {
           .onActionUpdate((event: GestureEvent) => {
             this.dragX = event.offsetX
             this.dragY = event.offsetY
-            this.draw()
           })
           .onActionEnd(() => {
             this.commitDrag()
@@ -376,8 +388,6 @@ export struct RunDetailPage {
             this.pinch = 1
             if (step !== 0) {
               this.zoomBy(step)
-            } else {
-              this.draw()
             }
           })
       )
@@ -389,7 +399,6 @@ export struct RunDetailPage {
         this.viewH = newValue.height
         this.rebuildTiles()
         this.tryFit()
-        this.draw()
       })
 
       // 顶部：返回按钮在左，右侧留空给状态栏
@@ -404,16 +413,16 @@ export struct RunDetailPage {
       Row() {
         Blank()
         Column({ space: AppSpace.Sm }) {
-          this.mapButton(this.satellite ? '影像' : '矢量', (): void => {
+          this.mapIconButton(this.satellite ? $r('sys.symbol.satellite_map') : $r('sys.symbol.map'), (): void => {
             this.satellite = !this.satellite
           })
-          this.mapButton('全览', (): void => {
+          this.mapIconButton($r('sys.symbol.arrow_up_left_and_arrow_down_right'), (): void => {
             this.fitTrack()
           })
-          this.mapButton('＋', (): void => {
+          this.mapIconButton($r('sys.symbol.plus'), (): void => {
             this.zoomBy(1)
           })
-          this.mapButton('－', (): void => {
+          this.mapIconButton($r('sys.symbol.minus'), (): void => {
             this.zoomBy(-1)
           })
         }
@@ -460,35 +469,40 @@ export struct RunDetailPage {
   backButton() {
     Row() {
       SymbolGlyph($r('sys.symbol.chevron_left'))
-        .fontSize(24)
-        .fontColor(['#1F2937'])
-        .width(26)
+        .fontSize(28)
+        .fontColor(['#FFFFFF'])
+        .width(30)
+        .height(30)
+        .shadow({ radius: 6, color: '#8C000000', offsetY: 1 })
     }
-    .width(FLOAT_BTN)
-    .height(FLOAT_BTN)
-    .borderRadius(FLOAT_BTN / 2)
-    .backgroundColor('#E6FFFFFF')
-    .shadow({ radius: 8, color: '#33000000', offsetY: 2 })
+    .width(44)
+    .height(44)
+    .justifyContent(FlexAlign.Center)
+    .alignItems(VerticalAlign.Center)
     .onClick(() => {
       this.nav.pop()
     })
   }
 
   @Builder
-  mapButton(label: string, action: () => void) {
-    Text(label)
-      .fontSize(AppFont.Caption)
-      .fontWeight(FontWeight.Medium)
-      .fontColor('#1F2937')
-      .textAlign(TextAlign.Center)
-      .width(FLOAT_BTN)
-      .height(FLOAT_BTN)
-      .borderRadius(FLOAT_BTN / 2)
-      .backgroundColor('#E6FFFFFF')
-      .shadow({ radius: 8, color: '#33000000', offsetY: 2 })
-      .onClick(() => {
-        action()
-      })
+  mapIconButton(symbol: Resource, action: () => void) {
+    Row() {
+      SymbolGlyph(symbol)
+        .fontSize(20)
+        .fontColor(['#1F2937'])
+        .width(22)
+        .height(22)
+    }
+    .width(FLOAT_BTN)
+    .height(FLOAT_BTN)
+    .borderRadius(FLOAT_BTN / 2)
+    .backgroundColor('#E6FFFFFF')
+    .shadow({ radius: 8, color: '#33000000', offsetY: 2 })
+    .justifyContent(FlexAlign.Center)
+    .alignItems(VerticalAlign.Center)
+    .onClick(() => {
+      action()
+    })
   }
 
   @Builder

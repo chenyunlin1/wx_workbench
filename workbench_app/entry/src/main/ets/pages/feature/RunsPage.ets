@@ -288,9 +288,9 @@ export struct RunsPage {
     TechCard() {
       Column({ space: AppSpace.Xs }) {
         Row({ space: 10 }) {
-          this.metric('总里程', RunFmt.km(this.totalKm) + ' km')
-          this.metric('总次数', this.totalCount + ' 次')
-          this.metric('总时长', RunFmt.hours(this.totalSeconds) + ' h')
+          this.metric(0, '总里程')
+          this.metric(1, '总次数')
+          this.metric(2, '总时长')
         }
         .width('100%')
 
@@ -326,9 +326,10 @@ export struct RunsPage {
   }
 
   @Builder
-  metric(label: string, value: string) {
+  metric(kind: number, label: string) {
     Column({ space: 3 }) {
-      Text(value)
+      // 汇总值必须在 Text 的更新闭包内读取，否则异步加载完成后还停在 0
+      Text(this.metricValue(kind))
         .fontSize(AppFont.BodyL)
         .fontWeight(FontWeight.Bold)
         .fontColor(AppColor.Brand)
@@ -343,6 +344,16 @@ export struct RunsPage {
     .borderRadius(AppRadius.Md)
     .backgroundColor($r('sys.color.comp_background_tertiary'))
     .alignItems(HorizontalAlign.Center)
+  }
+
+  private metricValue(kind: number): string {
+    if (kind === 0) {
+      return RunFmt.km(this.totalKm) + ' km'
+    }
+    if (kind === 1) {
+      return this.totalCount + ' 次'
+    }
+    return RunFmt.hours(this.totalSeconds) + ' h'
   }
 
   /** 月份分组头：左侧月份，右侧本月里程/次数/时长 */
