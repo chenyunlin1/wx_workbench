@@ -221,7 +221,7 @@ export struct RunsPage {
       const first = result.errors.length > 0 ? result.errors[0].message : '未知原因'
       return '同步失败：' + first
     }
-    const parts: string[] = ['活动 ' + result.activities, '详情 ' + result.details, '轨迹 ' + result.tracks]
+    const parts: string[] = ['活动 ' + result.activities, '详情 ' + result.details, '分段 ' + (result.laps ?? 0), '轨迹 ' + result.tracks]
     const tail = result.errors.length > 0 ? '（' + result.errors[0].tool + '：' + result.errors[0].message + '）' : ''
     return '同步完成 ' + parts.join(' · ') + tail
   }

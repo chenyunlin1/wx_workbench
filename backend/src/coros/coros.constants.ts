@@ -58,6 +58,10 @@ export const COROS_TRACK_MAX_POINTS = 700
 export const COROS_TRACK_THUMB_POINTS = 20
 /** 一条活动的轨迹最多重试几次（室内跑本来就没有 GPS，不能一直空转） */
 export const COROS_TRACK_ATTEMPT_LIMIT = 3
+/** 每次同步最多补取多少条活动的分段数据（每条一次调用） */
+export const COROS_LAP_BATCH_LIMIT = 12
+/** 分段数据最多重试几次 */
+export const COROS_LAP_ATTEMPT_LIMIT = 3
 /** FIT 文件时间与活动开始时间差多少以内算同一个活动 */
 export const COROS_TRACK_MATCH_TOLERANCE_SECONDS = 180
 /** 历史回填：一个月一个窗口，连续这么多个空窗口就认为已经取到最早的活动 */

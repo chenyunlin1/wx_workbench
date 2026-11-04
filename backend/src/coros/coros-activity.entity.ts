@@ -123,6 +123,30 @@ export class CorosActivity {
   @Column({ name: 'detail_synced_at', type: 'datetime', nullable: true })
   detailSyncedAt: Date | null
 
+  @Column({ name: 'max_hr', type: 'int', nullable: true, comment: '最大心率' })
+  maxHr: number | null
+
+  @Column({ name: 'max_cadence', type: 'int', nullable: true, comment: '最大步频' })
+  maxCadence: number | null
+
+  @Column({ name: 'avg_stride_cm', type: 'int', nullable: true, comment: '平均步幅，厘米' })
+  avgStrideCm: number | null
+
+  @Column({ name: 'elevation_loss', type: 'int', nullable: true, comment: '累计下降，米' })
+  elevationLoss: number | null
+
+  @Column({ name: 'steps', type: 'int', nullable: true, comment: '总步数，按距离与平均步幅推算' })
+  steps: number | null
+
+  @Column({ name: 'splits', type: 'mediumtext', nullable: true, comment: '分段数据 JSON：每公里的配速、心率与爬升' })
+  splits: string | null
+
+  @Column({ name: 'laps_synced_at', type: 'datetime', nullable: true })
+  lapsSyncedAt: Date | null
+
+  @Column({ name: 'lap_attempts', type: 'int', default: 0 })
+  lapAttempts: number
+
   @Column({ type: 'text', nullable: true, comment: '原始文本报告，字段不够用时从这里补' })
   raw: string | null
 

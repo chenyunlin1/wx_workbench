@@ -187,6 +187,134 @@ export const parseActivityDetail = (text: string): ParsedActivityDetail => {
   }
 }
 
+export interface ParsedLapSplit {
+  /** 分段序号，从 1 开始 */
+  index: number
+  distanceMeters: number
+  /** 本段用时（秒） */
+  seconds: number
+  /** 累计用时（秒） */
+  cumulativeSeconds: number
+  /** 本段配速（秒/公里） */
+  paceSeconds: number
+  avgHr: number | null
+  maxHr: number | null
+  avgCadence: number | null
+  /** 平均步幅，厘米 */
+  avgStrideCm: number | null
+  avgPower: number | null
+  /** 本段累计上升，米 */
+  elevationGain: number | null
+  /** 本段累计下降，米 */
+  elevationLoss: number | null
+}
+
+export interface ParsedLapSummary {
+  distanceMeters: number | null
+  durationSeconds: number | null
+  avgHr: number | null
+  maxHr: number | null
+  avgCadence: number | null
+  maxCadence: number | null
+  /** 平均步幅，厘米 */
+  avgStrideCm: number | null
+  avgPower: number | null
+  elevationGain: number | null
+  elevationLoss: number | null
+}
+
+export interface ParsedLapData {
+  /** 每公里分段（最后一段可能不足一公里） */
+  splits: ParsedLapSplit[]
+  summary: ParsedLapSummary
+}
+
+/** 高驰用 0 表示「这一项没有数据」，不是真的 0 */
+const lapNumber = (value: unknown): number | null => {
+  const num = typeof value === 'number' ? value : Number(value)
+  return Number.isFinite(num) && num > 0 ? num : null
+}
+
+/** 爬升不一样：0 米表示「这一段是平的」，是有效值 */
+const lapElevation = (value: unknown): number | null => {
+  const num = typeof value === 'number' ? value : Number(value)
+  return Number.isFinite(num) && num >= 0 ? num : null
+}
+
+const lapSummaryOf = (lap: Record<string, unknown>): ParsedLapSummary => ({
+  distanceMeters: lapNumber(lap.distance) === null ? null : Math.round((lapNumber(lap.distance) ?? 0) / 100),
+  durationSeconds: lapNumber(lap.time) === null ? null : Math.round(lapNumber(lap.time) ?? 0),
+  avgHr: lapNumber(lap.avgHr),
+  maxHr: lapNumber(lap.maxHr),
+  avgCadence: lapNumber(lap.avgCadence),
+  maxCadence: lapNumber(lap.maxCadence),
+  avgStrideCm: lapNumber(lap.avgStrideLength),
+  avgPower: lapNumber(lap.avgPower),
+  elevationGain: lapElevation(lap.elevGain),
+  elevationLoss: lapElevation(lap.totalDescent),
+})
+
+/**
+ * queryActivityLapData：这一次高驰回的是 JSON（不是文本报告）。
+ *
+ * lapGroups 按 type 分组：2=每公里分段、11=每 5 公里分段、-1=整段汇总。
+ * 单位要留意：距离是厘米、配速是秒/公里、步幅是厘米、爬升是米。
+ */
+export const parseActivityLapData = (text: string): ParsedLapData => {
+  const empty: ParsedLapData = {
+    splits: [],
+    summary: {
+      distanceMeters: null,
+      durationSeconds: null,
+      avgHr: null,
+      maxHr: null,
+      avgCadence: null,
+      maxCadence: null,
+      avgStrideCm: null,
+      avgPower: null,
+      elevationGain: null,
+      elevationLoss: null,
+    },
+  }
+
+  let payload: Record<string, unknown>
+  try {
+    payload = JSON.parse(unwrapToolText(text)) as Record<string, unknown>
+  } catch {
+    return empty
+  }
+
+  const groups = Array.isArray(payload?.lapGroups) ? (payload.lapGroups as Array<Record<string, unknown>>) : []
+  const groupOf = (type: number) => groups.find((group) => Number(group.type) === type)
+
+  const perKm = groupOf(2)
+  const splits: ParsedLapSplit[] = []
+  for (const lap of (perKm?.laps as Array<Record<string, unknown>>) ?? []) {
+    const distance = lapNumber(lap.distance)
+    if (distance === null) continue
+    splits.push({
+      index: Number(lap.lapIndex) || splits.length + 1,
+      distanceMeters: Math.round(distance / 100),
+      seconds: Math.round(lapNumber(lap.time) ?? 0),
+      cumulativeSeconds: Math.round(lapNumber(lap.totalLength) ?? 0),
+      paceSeconds: Math.round(lapNumber(lap.avgPace) ?? 0),
+      avgHr: lapNumber(lap.avgHr),
+      maxHr: lapNumber(lap.maxHr),
+      avgCadence: lapNumber(lap.avgCadence),
+      avgStrideCm: lapNumber(lap.avgStrideLength),
+      avgPower: lapNumber(lap.avgPower),
+      elevationGain: lapElevation(lap.elevGain),
+      elevationLoss: lapElevation(lap.totalDescent),
+    })
+  }
+
+  const overall = groupOf(-1) ?? groupOf(11)
+  const overallLap = ((overall?.laps as Array<Record<string, unknown>>) ?? [])[0]
+  const summary = overallLap ? lapSummaryOf(overallLap) : empty.summary
+
+  return { splits, summary }
+}
+
 export interface ParsedDailyHealth {
   restingHr: number | null
   hrvBaseline: number | null

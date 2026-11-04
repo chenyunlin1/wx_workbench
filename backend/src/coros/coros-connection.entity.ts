@@ -27,6 +27,8 @@ export interface CorosSyncReport {
   activities: number
   details: number
   tracks: number
+  /** 分段（每公里配速、心率）补齐了多少条 */
+  laps: number
   daily: number
   snapshots: string[]
   errors: { tool: string; message: string }[]

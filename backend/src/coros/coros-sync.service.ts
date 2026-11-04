@@ -7,6 +7,8 @@ import {
   COROS_HISTORY_MAX_WINDOWS,
   COROS_HISTORY_WINDOW_DAYS,
   COROS_HRV_CHUNK_DAYS,
+  COROS_LAP_ATTEMPT_LIMIT,
+  COROS_LAP_BATCH_LIMIT,
   COROS_SYNC_DEFAULT_DAYS,
   COROS_SYNC_MAX_DAYS,
   COROS_TRACK_ATTEMPT_LIMIT,
@@ -30,7 +32,9 @@ import {
 } from './fit-decoder'
 import {
   type ParsedActivity,
+  type ParsedLapSplit,
   parseActivityDetail,
+  parseActivityLapData,
   parseAvgHeartRate,
   parseDailyHealth,
   parseFitnessOverview,
@@ -64,6 +68,17 @@ const pairsOf = (text: string | null | undefined): number[][] => {
   try {
     const parsed = JSON.parse(text) as unknown
     return Array.isArray(parsed) ? (parsed as number[][]) : []
+  } catch {
+    return []
+  }
+}
+
+/** 分段列同样是 JSON 文本，写坏了就当这条记录没有分段 */
+const splitsOf = (text: string | null | undefined): ParsedLapSplit[] => {
+  if (!text) return []
+  try {
+    const parsed = JSON.parse(text) as unknown
+    return Array.isArray(parsed) ? (parsed as ParsedLapSplit[]) : []
   } catch {
     return []
   }
@@ -122,6 +137,7 @@ export class CorosSyncService {
           activities: 0,
           details: 0,
           tracks: 0,
+          laps: 0,
           daily: 0,
           snapshots: [],
           errors: [{ tool: authExpired ? 'coros-auth' : 'sync', message }],
@@ -146,6 +162,7 @@ export class CorosSyncService {
     let activities = 0
     let details = 0
     let tracks = 0
+    let laps = 0
     let daily = 0
     const snapshotKinds: CorosSnapshotKind[] = []
 
@@ -168,6 +185,7 @@ export class CorosSyncService {
       activities = await this.saveActivities(userId, records)
     }
     details = await this.syncActivityDetails(userId, from, to)
+    laps = await this.syncActivityLaps(userId, errors)
     tracks = await this.syncActivityTracks(userId)
 
     const cache = await this.loadDays(userId, from, to)
@@ -300,6 +318,7 @@ export class CorosSyncService {
       activities,
       details,
       tracks,
+      laps,
       daily,
       snapshots: snapshotKinds,
       errors,
@@ -308,7 +327,7 @@ export class CorosSyncService {
       durationMs: finishedAt.getTime() - startedAt.getTime(),
     })
 
-    return { activities, details, tracks, daily, snapshots: snapshotKinds.length, errors: errors.length }
+    return { activities, details, tracks, laps, daily, snapshots: snapshotKinds.length, errors: errors.length }
   }
 
   /** 详细数据一条一次调用，只补最近没取过的，避免同步越跑越慢 */
@@ -344,6 +363,64 @@ export class CorosSyncService {
         this.logger.warn(
           `活动 ${activity.labelId} 详情获取失败：${error instanceof Error ? error.message : String(error)}`,
         )
+      }
+    }
+
+    return done
+  }
+
+  /**
+   * 分段数据（每公里配速、心率、爬升）：详情页的配速条与心率曲线靠它。
+   * 一条活动一次调用，所以每次同步只补一批，剩下的靠反复下拉慢慢补齐。
+   */
+  private async syncActivityLaps(userId: number, errors: CorosSyncReport['errors']) {
+    const pending = await this.activities.find({
+      where: {
+        userId,
+        category: In(['running', 'cycling']),
+        lapsSyncedAt: IsNull(),
+        lapAttempts: LessThan(COROS_LAP_ATTEMPT_LIMIT),
+      },
+      order: { activityDate: 'DESC' },
+      take: COROS_LAP_BATCH_LIMIT,
+    })
+
+    let done = 0
+    for (const activity of pending) {
+      activity.lapAttempts += 1
+      try {
+        const text = await this.coros.callToolText(userId, 'queryActivityLapData', {
+          labelId: activity.labelId,
+          sportType: activity.sportType ?? 100,
+        })
+        const lap = parseActivityLapData(text)
+        const summary = lap.summary
+
+        activity.maxHr = summary.maxHr
+        activity.maxCadence = summary.maxCadence
+        activity.avgStrideCm = summary.avgStrideCm
+        activity.elevationLoss = summary.elevationLoss
+        if (summary.avgHr !== null) activity.avgHr = summary.avgHr
+        if (summary.avgCadence !== null) activity.avgCadence = summary.avgCadence
+        if (summary.avgPower !== null) activity.avgPower = summary.avgPower
+        if (summary.elevationGain !== null) activity.elevationGain = summary.elevationGain
+        if (lap.splits.length > 0) {
+          activity.splits = JSON.stringify(lap.splits)
+          done += 1
+        }
+        // 高驰不给总步数，用平均步幅从距离反推：7010 m ÷ 0.83 m ≈ 8400 步
+        if (activity.steps === null && activity.avgStrideCm !== null && activity.avgStrideCm > 0
+          && activity.distanceKm !== null && activity.distanceKm > 0) {
+          activity.steps = Math.round((activity.distanceKm * 1000) / (activity.avgStrideCm / 100))
+        }
+        activity.lapsSyncedAt = new Date()
+        await this.activities.save(activity)
+      } catch (error) {
+        if (error instanceof CorosAuthExpiredError) throw error
+        const message = error instanceof Error ? error.message : String(error)
+        errors.push({ tool: 'queryActivityLapData', message: `${activity.labelId}：${message}` })
+        this.logger.warn(`活动 ${activity.labelId} 分段获取失败：${message}`)
+        await this.activities.save(activity)
       }
     }
 
@@ -670,9 +747,10 @@ export class CorosSyncService {
       bbox = [minLon, minLat, maxLon, maxLat]
     }
 
-    const { raw: _raw, ...summary } = activity
+    const { raw: _raw, splits: _splits, lapsSyncedAt: _laps, lapAttempts: _attempts, ...summary } = activity
     return {
       activity: summary,
+      splits: splitsOf(activity.splits),
       track: stored
         ? {
             points,
@@ -710,8 +788,10 @@ export class CorosSyncService {
       connected: status.connected,
       account: status.account,
       sync: status.sync,
-      // raw 是整段文本报告，页面用不到，别让它把响应撑大
-      activities: activityRows.map(({ raw, userId: _user, createdAt: _c, updatedAt: _u, ...row }) => row),
+      // raw 是整段文本报告，splits 是分段 JSON，页面用不到，别让它们把响应撑大
+      activities: activityRows.map(
+        ({ raw, splits, lapsSyncedAt, lapAttempts, userId: _user, createdAt: _c, updatedAt: _u, ...row }) => row,
+      ),
       daily: daily.map(({ userId: _user, createdAt: _c, updatedAt: _u, ...row }) => row),
       fitness: payload('fitness'),
       recovery: payload('recovery'),

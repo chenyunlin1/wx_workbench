@@ -1,8 +1,9 @@
+import { pasteboard } from '@kit.BasicServicesKit'
 import { toast } from '../../common/AppKit'
 import { Api } from '../../api/Api'
 import { MapGeo, RunFmt, RunStyle } from '../../common/Running'
 import { AppColor, AppFont, AppRadius, AppSpace } from '../../theme/Theme'
-import { RunActivity, RunDetailResult, RunKmMark, RunTrackPoint } from '../../model/Models'
+import { RunActivity, RunDetailResult, RunKmMark, RunSplit, RunTrackPoint } from '../../model/Models'
 import { WindowUtils } from '../../utils/WindowUtils'
 import { Session } from '../../store/Session'
 
@@ -15,16 +16,27 @@ const TILE_MARGIN: number = 2
 const MAX_TILES: number = 120
 /** 全览时轨迹四周留出的边距（vp），避免端点贴到屏幕边 */
 const FIT_PAD: number = 52
-/** 底部数据卡片大概占多高：全览时轨迹要落在卡片上方的可见区里 */
-const PANEL_H: number = 236
-/** 悬浮按钮的边长 */
-const FLOAT_BTN: number = 40
 /**
  * 瓦片 URL 的版本号。
  * ArkUI 的 Image 缓存按完整 URL 走，服务端换了瓦片内容（比如占位图从红色改成透明）
  * 之后老 URL 会一直命中旧缓存，必须换 URL 才能让手机重新拉。
  */
 const TILE_VERSION: number = 2
+
+/** 底部数据卡的高度：跟着屏高走，但不低于这个值 */
+const CARD_MIN_H: number = 320
+const CARD_RATIO: number = 0.56
+/** 地图右侧工具条的按钮边长 */
+const FLOAT_BTN: number = 34
+/** 图表区高度与内边距 */
+const CHART_H: number = 118
+const CHART_PAD_L: number = 4
+const CHART_PAD_R: number = 6
+const CHART_PAD_T: number = 6
+const CHART_PAD_B: number = 16
+/** 配速条、图表里的绿色（高驰那套跑步绿） */
+const RUN_GREEN: string = '#7CC24A'
+const RUN_GREEN_DEEP: string = '#4FA92F'
 
 class TilePos {
   tx: number = 0
@@ -36,6 +48,7 @@ class TilePos {
   }
 }
 
+/** 指标格：数值 + 单位 + 名称 */
 class RunMetric {
   label: string = ''
   value: string = ''
@@ -49,7 +62,10 @@ class RunMetric {
 }
 
 /**
- * 跑步详情页：整屏天地图 + 悬浮数据卡片，形制对齐高驰 app。
+ * 跑步详情页：上方是轨迹地图，下方是一整屏可滚的数据卡。
+ *
+ * 版式对齐高驰 app：大号距离 + 快慢渐变条 + 九宫格指标 + 配速分段条 +
+ * 心率曲线 + 海拔曲线 + 分享按钮。
  *
  * 瓦片走后端 /map/tile 代理（Key 在服务端），轨迹点已经抽稀到 700 个以内，
  * 所以手势只做「整幅挪动 + 层级切换」，不做连续小数缩放——那需要重画整片瓦片。
@@ -59,14 +75,20 @@ export struct RunDetailPage {
   @Param nav: NavPathStack = new NavPathStack();
   @Local titleText: string = '跑步记录';
   @Local subtitleText: string = '';
-  @Local primary: RunMetric[] = [];
-  @Local metrics: RunMetric[] = [];
+  @Local sportText: string = '跑步';
+  @Local activity: RunActivity | null = null;
+  @Local stats: RunMetric[] = [];
+  @Local splits: RunSplit[] = [];
+  @Local distanceText: string = '-';
+  /** 快慢渐变条上标记的位置（0~100） */
+  @Local paceMarker: number = 50;
   @Local points: RunTrackPoint[] = [];
   @Local marks: RunKmMark[] = [];
   @Local bbox: number[] = [];
   @Local noteText: string = '';
   @Local loading: boolean = true;
   @Local satellite: boolean = true;
+  @Local showMarks: boolean = true;
   @Local tiles: TilePos[] = [];
   @Local zoom: number = 12;
   @Local centerX: number = 0;
@@ -76,6 +98,11 @@ export struct RunDetailPage {
   @Local pinch: number = 1;
   @Local viewW: number = 0;
   @Local viewH: number = 0;
+  @Local panelH: number = CARD_MIN_H;
+  @Local hrChartW: number = 0;
+  @Local hrChartH: number = CHART_H;
+  @Local eleChartW: number = 0;
+  @Local eleChartH: number = CHART_H;
   private fitted: boolean = false;
 
   aboutToAppear(): void {
@@ -87,14 +114,15 @@ export struct RunDetailPage {
     }
     Api.runningActivityDetail(labelId).then((detail: RunDetailResult) => {
       const activity: RunActivity = detail.activity
+      this.activity = activity
       this.titleText = RunFmt.title(activity.name, activity.sportName)
       this.subtitleText = RunFmt.stamp(activity.startTimestamp, activity.activityDate)
-      this.primary = [
-        new RunMetric('距离', RunFmt.km(activity.distanceKm), 'km'),
-        new RunMetric('运动时间', RunFmt.clock(activity.durationSeconds)),
-        new RunMetric('平均配速', RunFmt.pace(activity.paceSeconds), '/km')
-      ]
-      this.metrics = this.metricsOf(activity)
+      this.sportText = activity.sportName === null || activity.sportName.length === 0 ? '跑步' : activity.sportName
+      this.distanceText = RunFmt.km(activity.distanceKm)
+      this.splits = detail.splits === undefined ? [] : detail.splits
+      this.stats = this.statsOf(activity)
+      this.paceMarker = this.markerOf()
+
       const track = detail.track
       if (track === null || track.points.length < 2) {
         this.noteText = '这条记录没有 GPS 轨迹（室内运动或高驰未回传活动文件）'
@@ -118,17 +146,189 @@ export struct RunDetailPage {
     })
   }
 
-  private metricsOf(activity: RunActivity): RunMetric[] {
-    const rows: RunMetric[] = []
-    rows.push(new RunMetric('最快 1 公里', RunFmt.pace(activity.bestKmSeconds)))
-    rows.push(new RunMetric('累计上升', activity.elevationGain === null ? '-' : activity.elevationGain.toString(), 'm'))
-    rows.push(new RunMetric('消耗', activity.calories === null ? '-' : activity.calories.toString(), 'kcal'))
-    rows.push(new RunMetric('平均心率', activity.avgHr === null ? '-' : activity.avgHr.toString(), 'bpm'))
-    rows.push(new RunMetric('训练负荷', activity.trainingLoad === null ? '-' : activity.trainingLoad.toString(), 'TL'))
-    rows.push(new RunMetric('平均步频', activity.avgCadence === null ? '-' : activity.avgCadence.toString(), '步/分'))
-    rows.push(new RunMetric('平均功率', activity.avgPower === null ? '-' : activity.avgPower.toString(), 'W'))
-    rows.push(new RunMetric('运动表现', activity.performance === null ? '-' : activity.performance))
-    return rows
+  /** 九宫格：用时 / 平均配速 / 平均心率 · 步频 / 步幅 / 爬升 · 最快1公里 / 步数 / 大卡 */
+  private statsOf(activity: RunActivity): RunMetric[] {
+    return [
+      new RunMetric('用时', RunFmt.clock(activity.durationSeconds)),
+      new RunMetric('平均配速', RunFmt.pace(activity.paceSeconds), '/km'),
+      new RunMetric('平均心率', activity.avgHr === null ? '-' : activity.avgHr.toString(), 'bpm'),
+      new RunMetric('平均步频', activity.avgCadence === null ? '-' : activity.avgCadence.toString(), 'spm'),
+      new RunMetric('平均步幅', activity.avgStrideCm === null ? '-' : activity.avgStrideCm.toString(), 'cm'),
+      new RunMetric('累计爬升', activity.elevationGain === null ? '-' : activity.elevationGain.toString(), 'm'),
+      new RunMetric('最快 1 公里', RunFmt.pace(this.bestKmSeconds() ?? activity.bestKmSeconds)),
+      new RunMetric('总步数', activity.steps === null ? '-' : activity.steps.toString()),
+      new RunMetric('大卡', activity.calories === null ? '-' : activity.calories.toString(), 'kcal')
+    ]
+  }
+
+  /* ---------------- 分段数据 ---------------- */
+
+  /** 满一公里的段；最后那一小段单独算「不足一公里」 */
+  private fullKmSplits(): RunSplit[] {
+    return this.splits.filter((split: RunSplit) => split.distanceMeters >= 900)
+  }
+
+  private remainderSplit(): RunSplit | null {
+    const rest = this.splits.filter((split: RunSplit) => split.distanceMeters < 900)
+    return rest.length > 0 ? rest[rest.length - 1] : null
+  }
+
+  /** 最慢配速是 100%，平均配速落在哪 */
+  private markerOf(): number {
+    const paces = this.fullKmSplits().map((split: RunSplit) => split.paceSeconds).filter((p: number) => p > 0)
+    if (paces.length === 0) {
+      return 50
+    }
+    const min = Math.min(...paces)
+    const max = Math.max(...paces)
+    if (max <= min) {
+      return 50
+    }
+    const avg = paces.reduce((sum: number, value: number) => sum + value, 0) / paces.length
+    return Math.max(0, Math.min(100, (avg - min) / (max - min) * 100))
+  }
+
+  /** 配速条的长度：越慢的公里条越长 */
+  private paceBarPct(split: RunSplit): number {
+    const paces = this.fullKmSplits().map((item: RunSplit) => item.paceSeconds).filter((p: number) => p > 0)
+    if (paces.length === 0) {
+      return 100
+    }
+    const max = Math.max(...paces)
+    if (max <= 0) {
+      return 100
+    }
+    return Math.max(28, Math.min(100, split.paceSeconds / max * 100))
+  }
+
+  /** 跑到第 n 公里时的累计用时（秒） */
+  private cumulativeAtKm(km: number): number | null {
+    const list = this.fullKmSplits()
+    if (km <= 0 || km > list.length) {
+      return null
+    }
+    return list[km - 1].cumulativeSeconds
+  }
+
+  /** 心率曲线：每个公里一个平均心率，横轴是分钟 */
+  private hrSeries(): number[][] {
+    const points: number[][] = []
+    let seeded = false
+    for (const split of this.splits) {
+      if (split.avgHr === null || split.avgHr <= 0) {
+        continue
+      }
+      const x = split.cumulativeSeconds / 60
+      if (!seeded) {
+        points.push([0, split.avgHr])
+        seeded = true
+      }
+      points.push([x, split.avgHr])
+    }
+    return points
+  }
+
+  /** 海拔曲线：按公里累加爬升，横轴是分钟 */
+  private elevationSeries(): number[][] {
+    const points: number[][] = [[0, 0]]
+    let climbed = 0
+    for (const split of this.splits) {
+      climbed += split.elevationGain === null ? 0 : split.elevationGain
+      points.push([split.cumulativeSeconds / 60, climbed])
+    }
+    return points.length > 1 ? points : []
+  }
+
+  private totalMinutes(): number {
+    const last = this.splits.length > 0 ? this.splits[this.splits.length - 1] : null
+    const seconds = last === null ? 0 : last.cumulativeSeconds
+    return Math.max(1, seconds / 60)
+  }
+
+  /** 曲线点 → 画布坐标 */
+  private chartPoints(series: number[][], minV: number, maxV: number, xMax: number,
+    width: number, height: number): number[][] {
+    if (width <= 0 || height <= 0 || series.length === 0) {
+      return []
+    }
+    const innerW = width - CHART_PAD_L - CHART_PAD_R
+    const innerH = height - CHART_PAD_T - CHART_PAD_B
+    const span = Math.max(1, maxV - minV)
+    const points: number[][] = []
+    for (const item of series) {
+      const x = CHART_PAD_L + Math.max(0, Math.min(1, item[0] / xMax)) * innerW
+      const y = CHART_PAD_T + (1 - Math.max(0, Math.min(1, (item[1] - minV) / span))) * innerH
+      points.push([x, y])
+    }
+    return points
+  }
+
+  /** 折线下方的填充路径 */
+  private areaPath(series: number[][], minV: number, maxV: number, xMax: number,
+    width: number, height: number): string {
+    const points = this.chartPoints(series, minV, maxV, xMax, width, height)
+    if (points.length === 0) {
+      return ''
+    }
+    const bottom = height - CHART_PAD_B
+    let path = `M${points[0][0].toFixed(1)},${bottom.toFixed(1)}`
+    for (const point of points) {
+      path += ` L${point[0].toFixed(1)},${point[1].toFixed(1)}`
+    }
+    path += ` L${points[points.length - 1][0].toFixed(1)},${bottom.toFixed(1)} Z`
+    return path
+  }
+
+  private hrRange(): number[] {
+    const values = this.hrSeries().map((item: number[]) => item[1])
+    if (values.length === 0) {
+      return [60, 160]
+    }
+    const min = Math.min(...values)
+    const max = Math.max(...values)
+    return [Math.max(30, min - 12), max + 12]
+  }
+
+  private elevationRange(): number[] {
+    const values = this.elevationSeries().map((item: number[]) => item[1])
+    if (values.length === 0) {
+      return [0, 10]
+    }
+    const max = Math.max(...values)
+    return [0, Math.max(10, max + 5)]
+  }
+
+  /** 纵轴刻度：最高、次高、次低、最低 */
+  private axisLabels(range: number[]): string[] {
+    const max = range[1]
+    const min = range[0]
+    const step = (max - min) / 3
+    return [
+      max.toFixed(0),
+      (max - step).toFixed(0),
+      (min + step).toFixed(0),
+      min.toFixed(0)
+    ]
+  }
+
+  /** 分享：把这次运动的摘要复制到剪贴板 */
+  private shareSummary(): void {
+    const activity = this.activity
+    const lines: string[] = []
+    lines.push(`${this.sportText} ${this.distanceText} 公里`)
+    if (activity !== null) {
+      lines.push(`用时 ${RunFmt.clock(activity.durationSeconds)}`)
+      lines.push(`平均配速 ${RunFmt.pace(activity.paceSeconds)}`)
+      lines.push(`平均心率 ${activity.avgHr === null ? '-' : activity.avgHr.toString()} bpm`)
+      lines.push(`累计爬升 ${activity.elevationGain === null ? '-' : activity.elevationGain.toString()} m`)
+    }
+    lines.push(this.subtitleText)
+    const data = pasteboard.createData(pasteboard.MIMETYPE_TEXT_PLAIN, lines.join('\n'))
+    pasteboard.getSystemPasteboard().setData(data).then(() => {
+      toast('运动摘要已复制到剪贴板')
+    }).catch(() => {
+      toast('复制失败')
+    })
   }
 
   /** 服务端没给 bbox 时自己算一份，全览才有依据 */
@@ -210,7 +410,7 @@ export struct RunDetailPage {
 
   /** 卡片上方的可见高度：轨迹全览只在这一块里铺开 */
   private visibleH(): number {
-    return Math.max(this.viewH - PANEL_H, 160)
+    return Math.max(this.viewH - this.panelH, 160)
   }
 
   /** 把轨迹缩放到刚好铺满卡片上方的地图区 */
@@ -223,7 +423,7 @@ export struct RunDetailPage {
     this.centerX = MapGeo.lonToX((this.bbox[0] + this.bbox[2]) / 2, this.zoom)
     // 视口中心要下移半张卡片，轨迹才落在卡片上方而不是被卡片压住
     this.centerY = (MapGeo.mercV(this.bbox[3]) + MapGeo.mercV(this.bbox[1])) / 2 * MapGeo.worldPx(this.zoom)
-      + PANEL_H / 2
+      + this.panelH / 2
     this.dragX = 0
     this.dragY = 0
     this.pinch = 1
@@ -234,7 +434,7 @@ export struct RunDetailPage {
   private centerOn(lon: number, lat: number, level: number): void {
     this.zoom = Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, level))
     this.centerX = MapGeo.lonToX(lon, this.zoom)
-    this.centerY = MapGeo.latToY(lat, this.zoom) + PANEL_H / 2
+    this.centerY = MapGeo.latToY(lat, this.zoom) + this.panelH / 2
     this.dragX = 0
     this.dragY = 0
     this.pinch = 1
@@ -328,21 +528,23 @@ export struct RunDetailPage {
             .position({ x: 0, y: 0 })
             .hitTestBehavior(HitTestMode.None)
 
-          ForEach(this.marks, (mark: RunKmMark) => {
-            Stack() {
-              Circle({ width: 20, height: 20 })
-                .fill(RunStyle.MARK_FILL)
-                .stroke(RunStyle.MARK_EDGE)
-                .strokeWidth(1)
-              Text(mark.km.toString())
-                .fontSize(11)
-                .fontColor(RunStyle.MARK_TEXT)
-            }
-            .width(20)
-            .height(20)
-            .position({ x: this.screenX(mark.lon) - 10, y: this.screenY(mark.lat) - 10 })
-            .hitTestBehavior(HitTestMode.None)
-          }, (mark: RunKmMark) => mark.km.toString())
+          if (this.showMarks) {
+            ForEach(this.marks, (mark: RunKmMark) => {
+              Stack() {
+                Circle({ width: 20, height: 20 })
+                  .fill(RunStyle.MARK_FILL)
+                  .stroke(RunStyle.MARK_EDGE)
+                  .strokeWidth(1)
+                Text(mark.km.toString())
+                  .fontSize(11)
+                  .fontColor(RunStyle.MARK_TEXT)
+              }
+              .width(20)
+              .height(20)
+              .position({ x: this.screenX(mark.lon) - 10, y: this.screenY(mark.lat) - 10 })
+              .hitTestBehavior(HitTestMode.None)
+            }, (mark: RunKmMark) => mark.km.toString())
+          }
 
           Circle({ width: 14, height: 14 })
             .fill(RunStyle.START)
@@ -397,27 +599,41 @@ export struct RunDetailPage {
         }
         this.viewW = newValue.width
         this.viewH = newValue.height
+        this.panelH = Math.max(CARD_MIN_H, Math.round(newValue.height * CARD_RATIO))
         this.rebuildTiles()
         this.tryFit()
       })
 
-      // 顶部：返回按钮在左，右侧留空给状态栏
+      // 顶部：返回按钮在左，中间是这条记录的时间
       Row() {
         this.backButton()
+        Blank()
+        Text(this.subtitleText)
+          .fontSize(12)
+          .fontColor('#FFFFFF')
+          .padding({ left: 12, right: 12, top: 6, bottom: 6 })
+          .borderRadius(14)
+          .backgroundColor('#4D000000')
+        Blank()
+        this.moreButton()
       }
       .width('100%')
-      .padding({ top: WindowUtils.getStatusBarHeightVp() + AppSpace.Sm, left: AppSpace.Md })
+      .padding({ top: WindowUtils.getStatusBarHeightVp() + AppSpace.Sm, left: AppSpace.Md, right: AppSpace.Md })
+      .alignItems(VerticalAlign.Center)
       .hitTestBehavior(HitTestMode.Transparent)
 
-      // 右侧悬浮控制
+      // 右侧工具条
       Row() {
         Blank()
-        Column({ space: AppSpace.Sm }) {
+        Column({ space: 6 }) {
           this.mapIconButton(this.satellite ? $r('sys.symbol.satellite_map') : $r('sys.symbol.map'), (): void => {
             this.satellite = !this.satellite
           })
           this.mapIconButton($r('sys.symbol.arrow_up_left_and_arrow_down_right'), (): void => {
             this.fitTrack()
+          })
+          this.mapIconButton(this.showMarks ? $r('sys.symbol.flag_fill') : $r('sys.symbol.flag'), (): void => {
+            this.showMarks = !this.showMarks
           })
           this.mapIconButton($r('sys.symbol.plus'), (): void => {
             this.zoomBy(1)
@@ -426,7 +642,11 @@ export struct RunDetailPage {
             this.zoomBy(-1)
           })
         }
-        .alignItems(HorizontalAlign.End)
+        .padding({ top: 6, bottom: 6, left: 4, right: 4 })
+        .borderRadius(20)
+        .backgroundColor('#F2FFFFFF')
+        .shadow({ radius: 10, color: '#33000000', offsetY: 2 })
+        .alignItems(HorizontalAlign.Center)
       }
       .width('100%')
       .height('100%')
@@ -438,26 +658,25 @@ export struct RunDetailPage {
         Column() {
           Text(this.noteText.length > 0 ? this.noteText : '这条记录没有可显示的轨迹')
             .fontSize(AppFont.Body)
-            .fontColor($r('sys.color.font_secondary'))
+            .fontColor('#FFFFFF')
             .textAlign(TextAlign.Center)
             .padding({ left: AppSpace.Lg, right: AppSpace.Lg })
         }
         .width('100%')
         .height('100%')
-        .padding({ bottom: PANEL_H })
+        .padding({ bottom: this.panelH })
         .justifyContent(FlexAlign.Center)
         .alignItems(HorizontalAlign.Center)
         .hitTestBehavior(HitTestMode.Transparent)
       }
 
-      // 底部卡片：整屏容器 + 靠底对齐，卡片自身挡住地图手势
+      // 底部数据卡
       Column() {
-        this.dataPanel()
+        this.dataCard()
       }
       .width('100%')
       .height('100%')
       .justifyContent(FlexAlign.End)
-      .padding({ left: AppSpace.Sm, right: AppSpace.Sm, bottom: AppSpace.Sm })
       .hitTestBehavior(HitTestMode.Transparent)
     }
     .width('100%')
@@ -469,14 +688,15 @@ export struct RunDetailPage {
   backButton() {
     Row() {
       SymbolGlyph($r('sys.symbol.chevron_left'))
-        .fontSize(28)
+        .fontSize(26)
         .fontColor(['#FFFFFF'])
-        .width(30)
-        .height(30)
-        .shadow({ radius: 6, color: '#8C000000', offsetY: 1 })
+        .width(28)
+        .height(28)
     }
-    .width(44)
-    .height(44)
+    .width(40)
+    .height(40)
+    .borderRadius(20)
+    .backgroundColor('#4D000000')
     .justifyContent(FlexAlign.Center)
     .alignItems(VerticalAlign.Center)
     .onClick(() => {
@@ -485,19 +705,36 @@ export struct RunDetailPage {
   }
 
   @Builder
-  mapIconButton(symbol: Resource, action: () => void) {
+  moreButton() {
     Row() {
-      SymbolGlyph(symbol)
+      SymbolGlyph($r('sys.symbol.ellipsis_circle'))
         .fontSize(20)
-        .fontColor(['#1F2937'])
+        .fontColor(['#FFFFFF'])
         .width(22)
         .height(22)
     }
+    .width(40)
+    .height(40)
+    .borderRadius(20)
+    .backgroundColor('#4D000000')
+    .justifyContent(FlexAlign.Center)
+    .alignItems(VerticalAlign.Center)
+    .onClick(() => {
+      this.shareSummary()
+    })
+  }
+
+  @Builder
+  mapIconButton(symbol: Resource, action: () => void) {
+    Row() {
+      SymbolGlyph(symbol)
+        .fontSize(18)
+        .fontColor(['#1F2937'])
+        .width(20)
+        .height(20)
+    }
     .width(FLOAT_BTN)
     .height(FLOAT_BTN)
-    .borderRadius(FLOAT_BTN / 2)
-    .backgroundColor('#E6FFFFFF')
-    .shadow({ radius: 8, color: '#33000000', offsetY: 2 })
     .justifyContent(FlexAlign.Center)
     .alignItems(VerticalAlign.Center)
     .onClick(() => {
@@ -506,100 +743,525 @@ export struct RunDetailPage {
   }
 
   @Builder
-  dataPanel() {
+  dataCard() {
     Column() {
-      Row() {
-        Column({ space: 2 }) {
-          Text(this.titleText)
-            .fontSize(AppFont.Title)
-            .fontWeight(FontWeight.Bold)
-            .fontColor($r('sys.color.font_primary'))
-            .maxLines(1)
-            .textOverflow({ overflow: TextOverflow.Ellipsis })
-          Text(this.subtitleText)
-            .fontSize(11)
-            .fontColor($r('sys.color.font_secondary'))
+      Scroll() {
+        Column({ space: AppSpace.Md }) {
+          this.cardHeader()
+          this.distanceBlock()
+          this.statGrid()
+          this.paceSection()
+          this.heartSection()
+          this.elevationSection()
+          this.shareButton()
         }
-        .alignItems(HorizontalAlign.Start)
-        .layoutWeight(1)
+        .width('100%')
+        .padding({ left: AppSpace.Md, right: AppSpace.Md, bottom: AppSpace.Xl })
+      }
+      .scrollBar(BarState.Off)
+      .align(Alignment.Top)
+      .layoutWeight(1)
+      .width('100%')
+    }
+    .width('100%')
+    .height(this.panelH)
+    .backgroundColor($r('sys.color.comp_background_primary'))
+    .borderRadius({ topLeft: AppRadius.Xl, topRight: AppRadius.Xl })
+    .shadow({ radius: 18, color: '#26000000', offsetY: -4 })
+    .hitTestBehavior(HitTestMode.Block)
+  }
+
+  /** 卡片顶部：项目标签 + 标题 + 时间 */
+  @Builder
+  cardHeader() {
+    Row() {
+      Column({ space: 6 }) {
+        Text(this.sportText)
+          .fontSize(11)
+          .fontColor('#FFFFFF')
+          .padding({ left: 8, right: 8, top: 3, bottom: 3 })
+          .borderRadius(6)
+          .backgroundColor(RUN_GREEN_DEEP)
+        Text(this.titleText)
+          .fontSize(AppFont.TitleL)
+          .fontWeight(FontWeight.Bold)
+          .fontColor($r('sys.color.font_primary'))
+          .maxLines(1)
+          .textOverflow({ overflow: TextOverflow.Ellipsis })
+      }
+      .alignItems(HorizontalAlign.Start)
+      .layoutWeight(1)
+
+      Text(this.subtitleText)
+        .fontSize(12)
+        .fontColor($r('sys.color.font_secondary'))
+    }
+    .width('100%')
+    .alignItems(VerticalAlign.Center)
+    .margin({ top: AppSpace.Xs })
+  }
+
+  /** 大号距离 + 快慢渐变条 */
+  @Builder
+  distanceBlock() {
+    Column({ space: 6 }) {
+      Row({ space: 6 }) {
+        Text(this.distanceText)
+          .fontSize(42)
+          .fontWeight(FontWeight.Bold)
+          .fontColor($r('sys.color.font_primary'))
+          .maxLines(1)
+        Text('公里')
+          .fontSize(14)
+          .fontColor($r('sys.color.font_secondary'))
+          .margin({ bottom: 8 })
+      }
+      .width('100%')
+      .alignItems(VerticalAlign.Bottom)
+
+      Stack({ alignContent: Alignment.Start }) {
+        Row()
+          .width('100%')
+          .height(4)
+          .borderRadius(2)
+          .linearGradient({
+            angle: 0,
+            colors: [['#5B8FF9', 0.0], ['#5AD8A6', 0.45], ['#FACC15', 0.72], ['#F56C6C', 1.0]]
+          })
+        Circle({ width: 8, height: 8 })
+          .fill('#FFFFFF')
+          .stroke('#3A3A3A')
+          .strokeWidth(1)
+          .position({ x: `${this.paceMarker}%` })
+          .margin({ left: -4 })
+      }
+      .width('100%')
+      .height(10)
+
+      Row() {
+        Text('慢')
+          .fontSize(10)
+          .fontColor($r('sys.color.font_tertiary'))
+        Blank()
+        Text('快')
+          .fontSize(10)
+          .fontColor($r('sys.color.font_tertiary'))
+      }
+      .width('100%')
+    }
+    .width('100%')
+    .alignItems(HorizontalAlign.Start)
+  }
+
+  /** 九宫格指标 */
+  @Builder
+  statGrid() {
+    GridRow({ columns: 3, gutter: 8 }) {
+      ForEach(this.stats, (item: RunMetric) => {
+        GridCol({ span: 1 }) {
+          Column({ space: 3 }) {
+            Row({ space: 3 }) {
+              Text(item.value)
+                .fontSize(19)
+                .fontWeight(FontWeight.Bold)
+                .fontColor($r('sys.color.font_primary'))
+                .maxLines(1)
+                .textOverflow({ overflow: TextOverflow.Ellipsis })
+              if (item.unit.length > 0) {
+                Text(item.unit)
+                  .fontSize(10)
+                  .fontColor($r('sys.color.font_secondary'))
+              }
+            }
+            .width('100%')
+            .justifyContent(FlexAlign.Center)
+
+            Text(item.label)
+              .fontSize(10)
+              .fontColor($r('sys.color.font_secondary'))
+              .maxLines(1)
+              .textOverflow({ overflow: TextOverflow.Ellipsis })
+          }
+          .width('100%')
+          .padding({ top: AppSpace.Xs, bottom: AppSpace.Xs })
+          .borderRadius(AppRadius.Sm)
+          .backgroundColor($r('sys.color.comp_background_tertiary'))
+          .alignItems(HorizontalAlign.Center)
+        }
+      }, (item: RunMetric) => item.label)
+    }
+    .width('100%')
+  }
+
+  /** 配速：每个公里一条，条长表示这一公里有多慢 */
+  @Builder
+  paceSection() {
+    Column({ space: 8 }) {
+      Row() {
+        Text('配速')
+          .fontSize(AppFont.Title)
+          .fontWeight(FontWeight.Bold)
+          .fontColor($r('sys.color.font_primary'))
+        Blank()
+        Text('平均: ' + RunFmt.pace(this.avgPaceSeconds()))
+          .fontSize(12)
+          .fontColor($r('sys.color.font_secondary'))
+        Text('　公里最快: ' + RunFmt.pace(this.bestKmSeconds()))
+          .fontSize(12)
+          .fontColor($r('sys.color.font_secondary'))
       }
       .width('100%')
 
-      if (this.loading) {
-        Text('正在读取记录…')
-          .fontSize(AppFont.Body)
+      if (this.fullKmSplits().length === 0) {
+        Text('分段数据还没有同步，下拉刷新后再看')
+          .fontSize(12)
           .fontColor($r('sys.color.font_tertiary'))
-          .width('100%')
-          .height(64)
-          .textAlign(TextAlign.Center)
       } else {
-        Row({ space: 8 }) {
-          ForEach(this.primary, (item: RunMetric) => {
-            Column({ space: 2 }) {
-              Row({ space: 3 }) {
-                Text(item.value)
-                  .fontSize(26)
-                  .fontWeight(FontWeight.Bold)
-                  .fontColor($r('sys.color.font_primary'))
-                  .maxLines(1)
-                  .textOverflow({ overflow: TextOverflow.Ellipsis })
-                if (item.unit.length > 0) {
-                  Text(item.unit)
-                    .fontSize(11)
-                    .fontColor($r('sys.color.font_secondary'))
-                }
-              }
-              Text(item.label)
-                .fontSize(10)
-                .fontColor($r('sys.color.font_secondary'))
-                .maxLines(1)
-            }
+        Row() {
+          Text('公里')
+            .fontSize(11)
+            .fontColor($r('sys.color.font_secondary'))
+            .width(24)
+          Text('配速/公里')
+            .fontSize(11)
+            .fontColor($r('sys.color.font_secondary'))
             .layoutWeight(1)
-            .alignItems(HorizontalAlign.Center)
-          }, (item: RunMetric) => item.label)
+          Text('累计用时')
+            .fontSize(11)
+            .fontColor($r('sys.color.font_secondary'))
+            .width(66)
+            .textAlign(TextAlign.End)
         }
         .width('100%')
-        .margin({ top: AppSpace.Sm, bottom: AppSpace.Sm })
 
-        Divider().color(AppColor.Divider)
+        ForEach(this.fullKmSplits(), (split: RunSplit) => {
+          this.paceRow(split)
+        }, (split: RunSplit) => split.index.toString())
 
-        GridRow({ columns: 4, gutter: 8 }) {
-          ForEach(this.metrics, (item: RunMetric) => {
-            GridCol({ span: 1 }) {
-              Column({ space: 2 }) {
-                Row({ space: 2 }) {
-                  Text(item.value)
-                    .fontSize(AppFont.Body)
-                    .fontWeight(FontWeight.Medium)
-                    .fontColor($r('sys.color.font_primary'))
-                    .maxLines(1)
-                    .textOverflow({ overflow: TextOverflow.Ellipsis })
-                  if (item.unit.length > 0) {
-                    Text(item.unit)
-                      .fontSize(9)
-                      .fontColor($r('sys.color.font_tertiary'))
-                  }
-                }
-                Text(item.label)
-                  .fontSize(10)
-                  .fontColor($r('sys.color.font_tertiary'))
-                  .maxLines(1)
-              }
-              .width('100%')
-              .padding({ top: AppSpace.Xs, bottom: AppSpace.Xs })
-              .alignItems(HorizontalAlign.Center)
-            }
-          }, (item: RunMetric) => item.label)
+        if (this.fiveKmNote().length > 0) {
+          Text(this.fiveKmNote())
+            .fontSize(11)
+            .fontColor($r('sys.color.font_secondary'))
+            .margin({ top: 2 })
         }
-        .width('100%')
-        .padding({ top: AppSpace.Xs, bottom: AppSpace.Sm })
+
+        if (this.remainderSplit() !== null) {
+          Text('最后不足一公里用时 ' + RunFmt.clock(this.remainderSplit()!.seconds))
+            .fontSize(11)
+            .fontColor($r('sys.color.font_secondary'))
+        }
       }
     }
     .width('100%')
-    .padding({ left: AppSpace.Md, right: AppSpace.Md, top: AppSpace.Sm, bottom: AppSpace.Sm })
-    .backgroundColor($r('sys.color.comp_background_primary'))
-    .borderRadius({ topLeft: AppRadius.Xl, topRight: AppRadius.Xl })
-    .shadow({ radius: 16, color: '#22000000', offsetY: -4 })
-    .hitTestBehavior(HitTestMode.Block)
+    .alignItems(HorizontalAlign.Start)
+    .padding({ top: AppSpace.Sm, bottom: AppSpace.Sm })
+    .borderRadius(AppRadius.Md)
+    .backgroundColor($r('sys.color.comp_background_tertiary'))
+  }
+
+  @Builder
+  paceRow(split: RunSplit) {
+    Row({ space: 8 }) {
+      Text(split.index.toString())
+        .fontSize(12)
+        .fontColor($r('sys.color.font_primary'))
+        .width(24)
+
+      Stack({ alignContent: Alignment.Start }) {
+        Row()
+          .width('100%')
+          .height(18)
+          .borderRadius(9)
+          .backgroundColor('#1A000000')
+        Row()
+          .width(`${this.paceBarPct(split)}%`)
+          .height(18)
+          .borderRadius(9)
+          .backgroundColor(RUN_GREEN)
+        Text(RunFmt.pace(split.paceSeconds))
+          .fontSize(11)
+          .fontColor('#1F2937')
+          .margin({ left: 8 })
+          .align(Alignment.Center)
+      }
+      .layoutWeight(1)
+      .height(18)
+
+      Text(RunFmt.clock(split.cumulativeSeconds))
+        .fontSize(12)
+        .fontWeight(FontWeight.Medium)
+        .fontColor($r('sys.color.font_primary'))
+        .width(66)
+        .textAlign(TextAlign.End)
+    }
+    .width('100%')
+    .alignItems(VerticalAlign.Center)
+  }
+
+  /** 心率：平均值 + 曲线 */
+  @Builder
+  heartSection() {
+    Column({ space: 6 }) {
+      Row() {
+        Text('心率')
+          .fontSize(AppFont.Title)
+          .fontWeight(FontWeight.Bold)
+          .fontColor($r('sys.color.font_primary'))
+        Blank()
+        Text('平均: ' + this.avgHrText() + '　最大: ' + this.maxHrText())
+          .fontSize(12)
+          .fontColor($r('sys.color.font_secondary'))
+        Text('　次/分钟')
+          .fontSize(12)
+          .fontColor('#E5484D')
+      }
+      .width('100%')
+
+      if (this.hrSeries().length === 0) {
+        Text('这次运动没有心率分段数据')
+          .fontSize(12)
+          .fontColor($r('sys.color.font_tertiary'))
+      } else {
+        Stack({ alignContent: Alignment.TopStart }) {
+          ForEach(this.axisLabels(this.hrRange()), (label: string, index: number) => {
+            Text(label)
+              .fontSize(9)
+              .fontColor($r('sys.color.font_tertiary'))
+              .width(28)
+              .textAlign(TextAlign.End)
+              .position({ x: 0, y: this.axisY(index) - 6 })
+          }, (label: string) => label)
+
+          Polyline({ width: this.hrChartW, height: this.hrChartH })
+            .points(this.chartPoints(this.hrSeries(), this.hrRange()[0], this.hrRange()[1],
+              this.totalMinutes(), this.hrChartW, this.hrChartH))
+            .stroke('#E5484D')
+            .strokeWidth(2)
+            .strokeLineCap(LineCapStyle.Round)
+            .strokeLineJoin(LineJoinStyle.Round)
+            .position({ x: 34, y: 0 })
+            .hitTestBehavior(HitTestMode.None)
+
+          ForEach(this.xAxisLabels(), (label: string, index: number) => {
+            Text(label)
+              .fontSize(9)
+              .fontColor($r('sys.color.font_tertiary'))
+              .width(28)
+              .textAlign(TextAlign.Center)
+              .position({ x: 34 + this.axisX(index) - 14, y: this.hrChartH - CHART_PAD_B + 2 })
+          }, (label: string) => label)
+
+          Text('分钟')
+            .fontSize(9)
+            .fontColor('#E5484D')
+            .position({ x: this.hrChartW + 20, y: this.hrChartH - CHART_PAD_B + 2 })
+        }
+        .width('100%')
+        .height(this.hrChartH)
+        .onSizeChange((_oldValue: SizeOptions, newValue: SizeOptions) => {
+          if (typeof newValue.width === 'number' && typeof newValue.height === 'number') {
+            this.hrChartW = newValue.width - 34
+            this.hrChartH = newValue.height
+          }
+        })
+      }
+    }
+    .width('100%')
+    .alignItems(HorizontalAlign.Start)
+    .padding({ top: AppSpace.Sm, bottom: AppSpace.Sm })
+    .borderRadius(AppRadius.Md)
+    .backgroundColor($r('sys.color.comp_background_tertiary'))
+  }
+
+  /** 海拔：累计爬升 + 面积图 */
+  @Builder
+  elevationSection() {
+    Column({ space: 6 }) {
+      Row() {
+        Text('海拔')
+          .fontSize(AppFont.Title)
+          .fontWeight(FontWeight.Bold)
+          .fontColor($r('sys.color.font_primary'))
+        Blank()
+        Text('累计爬升: ' + this.climbText())
+          .fontSize(12)
+          .fontColor($r('sys.color.font_secondary'))
+        Text('　米')
+          .fontSize(12)
+          .fontColor(RUN_GREEN_DEEP)
+      }
+      .width('100%')
+
+      if (this.elevationSeries().length === 0) {
+        Text('这次运动没有海拔分段数据')
+          .fontSize(12)
+          .fontColor($r('sys.color.font_tertiary'))
+      } else {
+        Stack({ alignContent: Alignment.TopStart }) {
+          ForEach(this.axisLabels(this.elevationRange()), (label: string, index: number) => {
+            Text(label)
+              .fontSize(9)
+              .fontColor($r('sys.color.font_tertiary'))
+              .width(28)
+              .textAlign(TextAlign.End)
+              .position({ x: 0, y: this.axisY(index) - 6 })
+          }, (label: string) => label)
+
+          Path({ width: this.eleChartW, height: this.eleChartH })
+            .commands(this.areaPath(this.elevationSeries(), this.elevationRange()[0], this.elevationRange()[1],
+              this.totalMinutes(), this.eleChartW, this.eleChartH))
+            .fill('#33A0E070')
+            .position({ x: 34, y: 0 })
+            .hitTestBehavior(HitTestMode.None)
+
+          Polyline({ width: this.eleChartW, height: this.eleChartH })
+            .points(this.chartPoints(this.elevationSeries(), this.elevationRange()[0], this.elevationRange()[1],
+              this.totalMinutes(), this.eleChartW, this.eleChartH))
+            .stroke(RUN_GREEN_DEEP)
+            .strokeWidth(2)
+            .strokeLineCap(LineCapStyle.Round)
+            .strokeLineJoin(LineJoinStyle.Round)
+            .position({ x: 34, y: 0 })
+            .hitTestBehavior(HitTestMode.None)
+
+          ForEach(this.xAxisLabels(), (label: string, index: number) => {
+            Text(label)
+              .fontSize(9)
+              .fontColor($r('sys.color.font_tertiary'))
+              .width(28)
+              .textAlign(TextAlign.Center)
+              .position({ x: 34 + this.axisX(index) - 14, y: this.eleChartH - CHART_PAD_B + 2 })
+          }, (label: string) => label)
+
+          Text('分钟')
+            .fontSize(9)
+            .fontColor(RUN_GREEN_DEEP)
+            .position({ x: this.eleChartW + 20, y: this.eleChartH - CHART_PAD_B + 2 })
+        }
+        .width('100%')
+        .height(this.eleChartH)
+        .onSizeChange((_oldValue: SizeOptions, newValue: SizeOptions) => {
+          if (typeof newValue.width === 'number' && typeof newValue.height === 'number') {
+            this.eleChartW = newValue.width - 34
+            this.eleChartH = newValue.height
+          }
+        })
+      }
+    }
+    .width('100%')
+    .alignItems(HorizontalAlign.Start)
+    .padding({ top: AppSpace.Sm, bottom: AppSpace.Sm })
+    .borderRadius(AppRadius.Md)
+    .backgroundColor($r('sys.color.comp_background_tertiary'))
+  }
+
+  @Builder
+  shareButton() {
+    Row() {
+      Text('分享运动记录')
+        .fontSize(AppFont.BodyL)
+        .fontWeight(FontWeight.Medium)
+        .fontColor('#FFFFFF')
+    }
+    .width('100%')
+    .height(46)
+    .borderRadius(23)
+    .backgroundColor(RUN_GREEN_DEEP)
+    .justifyContent(FlexAlign.Center)
+    .alignItems(VerticalAlign.Center)
+    .onClick(() => {
+      this.shareSummary()
+    })
+  }
+
+  /* ---------------- 汇总取值 ---------------- */
+
+  private avgPaceSeconds(): number | null {
+    const paces = this.fullKmSplits().map((split: RunSplit) => split.paceSeconds).filter((p: number) => p > 0)
+    if (paces.length === 0) {
+      return null
+    }
+    return Math.round(paces.reduce((sum: number, value: number) => sum + value, 0) / paces.length)
+  }
+
+  private bestKmSeconds(): number | null {
+    const paces = this.fullKmSplits().map((split: RunSplit) => split.paceSeconds).filter((p: number) => p > 0)
+    if (paces.length === 0) {
+      return null
+    }
+    return Math.min(...paces)
+  }
+
+  private avgHrText(): string {
+    const values = this.hrSeries().map((item: number[]) => item[1])
+    if (values.length === 0) {
+      return '-'
+    }
+    return Math.round(values.reduce((sum: number, value: number) => sum + value, 0) / values.length).toString()
+  }
+
+  private maxHrText(): string {
+    const values = this.hrSeries().map((item: number[]) => item[1])
+    if (values.length === 0) {
+      return '-'
+    }
+    return Math.max(...values).toString()
+  }
+
+  private climbText(): string {
+    const values = this.elevationSeries().map((item: number[]) => item[1])
+    if (values.length === 0) {
+      return '0.00'
+    }
+    return Math.max(...values).toFixed(2)
+  }
+
+  /** 「5公里累计用时 / 近5公里用时」这两行提示 */
+  private fiveKmNote(): string {
+    const list = this.fullKmSplits()
+    if (list.length < 6) {
+      return ''
+    }
+    const five = this.cumulativeAtKm(5)
+    if (five === null) {
+      return ''
+    }
+    let note = '5公里累计用时 ' + RunFmt.clock(five)
+    const before = this.cumulativeAtKm(list.length - 5)
+    if (before !== null) {
+      const last = list[list.length - 1].cumulativeSeconds
+      note += '　近5公里用时 ' + RunFmt.clock(last - before)
+    }
+    return note
+  }
+
+  /** 横轴刻度：0、10、20… 分钟 */
+  private xAxisLabels(): string[] {
+    const total = Math.ceil(this.totalMinutes())
+    const labels: string[] = []
+    for (let minute = 0; minute <= total; minute += 10) {
+      labels.push(minute.toString())
+    }
+    if (labels.length === 0 || labels[labels.length - 1] !== total.toString()) {
+      labels.push(total.toString())
+    }
+    return labels
+  }
+
+  private axisX(index: number): number {
+    const labels = this.xAxisLabels()
+    if (labels.length === 0) {
+      return 0
+    }
+    const total = Math.ceil(this.totalMinutes())
+    const value = Number(labels[index])
+    return value / Math.max(1, total) * (this.hrChartW - CHART_PAD_L - CHART_PAD_R)
+  }
+
+  /** 纵轴刻度的 y 坐标 */
+  private axisY(index: number): number {
+    const innerH = this.hrChartH - CHART_PAD_T - CHART_PAD_B
+    const steps = 3
+    return CHART_PAD_T + (index / steps) * innerH
   }
 }

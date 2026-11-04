@@ -308,6 +308,30 @@ export interface RunActivity {
   bestKmSeconds: number | null
   trainingFocus: string | null
   performance: string | null
+  maxHr: number | null
+  maxCadence: number | null
+  /** 平均步幅，厘米 */
+  avgStrideCm: number | null
+  /** 累计下降，米 */
+  elevationLoss: number | null
+  /** 总步数（按距离与平均步幅推算） */
+  steps: number | null
+}
+
+/** 每个公里一段：配速、心率、步频与该段爬升 */
+export interface RunSplit {
+  index: number
+  distanceMeters: number
+  seconds: number
+  cumulativeSeconds: number
+  paceSeconds: number
+  avgHr: number | null
+  maxHr: number | null
+  avgCadence: number | null
+  avgStrideCm: number | null
+  avgPower: number | null
+  elevationGain: number | null
+  elevationLoss: number | null
 }
 
 export interface RunTrackPoint {
@@ -334,6 +358,8 @@ export interface RunTrack {
 export interface RunDetailResult {
   activity: RunActivity
   track: RunTrack | null
+  /** 每公里分段：配速条、心率曲线与海拔曲线都靠它 */
+  splits: RunSplit[]
 }
 
 export interface CorosSyncError {
@@ -345,6 +371,8 @@ export interface CorosSyncResult {
   activities: number
   details: number
   tracks: number
+  /** 分段（每公里配速、心率）补齐了多少条 */
+  laps?: number
   daily: number
   errors: CorosSyncError[]
 }
