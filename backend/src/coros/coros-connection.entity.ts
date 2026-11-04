@@ -26,6 +26,7 @@ export interface CorosSyncReport {
   to: string
   activities: number
   details: number
+  tracks: number
   daily: number
   snapshots: string[]
   errors: { tool: string; message: string }[]

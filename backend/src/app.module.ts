@@ -12,6 +12,7 @@ import { Collection } from './collection/collection.entity'
 import { CollectionModule } from './collection/collection.module'
 import { JwtAuthGuard } from './common/guards/jwt-auth.guard'
 import { CorosActivity } from './coros/coros-activity.entity'
+import { CorosActivityTrack } from './coros/coros-activity-track.entity'
 import { CorosConnection } from './coros/coros-connection.entity'
 import { CorosDailyMetric } from './coros/coros-daily-metric.entity'
 import { CorosModule } from './coros/coros.module'
@@ -36,6 +37,7 @@ import { InterviewsModule } from './interviews/interviews.module'
 import { Knowledge } from './knowledge/knowledge.entity'
 import { KnowledgeModule } from './knowledge/knowledge.module'
 import { LearningModule } from './learning/learning.module'
+import { MapModule } from './map/map.module'
 import { OpsCommand } from './ops/ops-command.entity'
 import { OpsModule } from './ops/ops.module'
 import { PracticeModule } from './practice/practice.module'
@@ -78,6 +80,7 @@ import { WorkoutModule } from './workout/workout.module'
           AiMessage,
           CorosConnection,
           CorosActivity,
+          CorosActivityTrack,
           CorosDailyMetric,
           CorosSnapshot,
           OpsCommand,
@@ -107,6 +110,7 @@ import { WorkoutModule } from './workout/workout.module'
     ShoppingModule,
     WorkoutModule,
     OpsModule,
+    MapModule,
   ],
   controllers: [AppController],
   providers: [

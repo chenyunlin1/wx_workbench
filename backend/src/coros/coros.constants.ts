@@ -47,6 +47,23 @@ export const COROS_SYNC_MAX_DAYS = 180
 export const COROS_HRV_CHUNK_DAYS = 7
 /** 每次同步最多补取多少条活动的详细数据（每条一次调用，太慢） */
 export const COROS_ACTIVITY_DETAIL_LIMIT = 12
+/**
+ * 每次同步最多补取多少条活动的 FIT 轨迹。
+ * 高驰对 FIT 文件有每日下载限额，所以轨迹是「每次下拉攒一点」慢慢铺满的。
+ */
+export const COROS_TRACK_BATCH_LIMIT = 8
+/** 折线抽稀后的点数上限，够画且够算公里标记即可 */
+export const COROS_TRACK_MAX_POINTS = 700
+/** 列表缩略图只画个形状，十几个点就够，省得列表接口拖着整条轨迹 */
+export const COROS_TRACK_THUMB_POINTS = 20
+/** 一条活动的轨迹最多重试几次（室内跑本来就没有 GPS，不能一直空转） */
+export const COROS_TRACK_ATTEMPT_LIMIT = 3
+/** FIT 文件时间与活动开始时间差多少以内算同一个活动 */
+export const COROS_TRACK_MATCH_TOLERANCE_SECONDS = 180
+/** 历史回填：一个月一个窗口，连续这么多个空窗口就认为已经取到最早的活动 */
+export const COROS_HISTORY_WINDOW_DAYS = 31
+export const COROS_HISTORY_EMPTY_WINDOWS = 6
+export const COROS_HISTORY_MAX_WINDOWS = 96
 /** 后台同步超过这个时间还挂着，就当作进程重启留下的僵尸状态 */
 export const COROS_SYNC_STALE_MS = 5 * 60_000
 

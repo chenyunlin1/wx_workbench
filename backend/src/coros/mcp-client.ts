@@ -65,23 +65,70 @@ const readFrame = async (response: Response, id?: number): Promise<JsonRpcFrame 
   return frames.find((frame) => frame.result !== undefined || frame.error !== undefined) ?? null
 }
 
+/** 工具回的二进制附件：FIT 活动文件走 resource/image 的 base64 blob */
+export interface McpFile {
+  name: string
+  mimeType: string
+  bytes: Uint8Array
+}
+
+export interface McpToolResult {
+  text: string
+  isError: boolean
+  files: McpFile[]
+}
+
+const decodeBase64 = (value: string): Uint8Array | null => {
+  const clean = value.replace(/\s+/g, '')
+  if (clean.length < 16 || clean.length % 4 !== 0) return null
+  try {
+    return new Uint8Array(Buffer.from(clean, 'base64'))
+  } catch {
+    return null
+  }
+}
+
 const flattenContent = (result: unknown): McpToolResult => {
-  if (!result || typeof result !== 'object') return { text: String(result ?? ''), isError: false }
+  if (!result || typeof result !== 'object') {
+    return { text: String(result ?? ''), isError: false, files: [] }
+  }
 
   const body = result as { content?: unknown; structuredContent?: unknown; isError?: boolean }
   const parts: string[] = []
+  const files: McpFile[] = []
 
   if (Array.isArray(body.content)) {
     for (const item of body.content) {
       if (!item || typeof item !== 'object') continue
-      const text = (item as { text?: string }).text
-      if (text) parts.push(text)
+      const entry = item as {
+        type?: string
+        text?: string
+        data?: string
+        mimeType?: string
+        name?: string
+        resource?: { uri?: string; name?: string; mimeType?: string; blob?: string }
+      }
+
+      if (entry.text) parts.push(entry.text)
+
+      const blob = entry.resource?.blob ?? entry.data
+      if (blob) {
+        const bytes = decodeBase64(blob)
+        if (bytes) {
+          files.push({
+            name: entry.resource?.name ?? entry.name ?? entry.resource?.uri ?? `file-${files.length + 1}.fit`,
+            mimeType: entry.resource?.mimeType ?? entry.mimeType ?? 'application/octet-stream',
+            bytes,
+          })
+        }
+      }
+      if (entry.resource?.uri && !blob) parts.push(entry.resource.uri)
     }
   }
   if (body.structuredContent !== undefined) parts.push(JSON.stringify(body.structuredContent))
-  if (!parts.length) parts.push(JSON.stringify(result))
+  if (!parts.length && !files.length) parts.push(JSON.stringify(result))
 
-  return { text: parts.join('\n'), isError: Boolean(body.isError) }
+  return { text: parts.join('\n'), isError: Boolean(body.isError), files }
 }
 
 /**

@@ -11,6 +11,8 @@ import { OpenSourcePage } from './OpenSourcePage';
 import { SchedulesPage } from './feature/SchedulesPage';
 import { HabitsPage } from './feature/HabitsPage';
 import { WorkoutPage } from './feature/WorkoutPage';
+import { RunsPage } from './feature/RunsPage';
+import { RunDetailPage } from './feature/RunDetailPage';
 import { FinancePage } from './feature/FinancePage';
 import { CollectionPage } from './feature/CollectionPage';
 import { InterviewsPage } from './feature/InterviewsPage';
@@ -118,6 +120,14 @@ struct Index {
     } else if (name === 'workout') {
       ProfileMenuDestination() {
         WorkoutPage({ nav: this.navStack })
+      }
+    } else if (name === 'runs') {
+      ProfileMenuDestination() {
+        RunsPage({ nav: this.navStack })
+      }
+    } else if (name === 'runDetail') {
+      ProfileMenuDestination() {
+        RunDetailPage({ nav: this.navStack })
       }
     } else if (name === 'finance') {
       ProfileMenuDestination() {

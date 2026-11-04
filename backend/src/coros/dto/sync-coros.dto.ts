@@ -1,6 +1,6 @@
 import { ApiPropertyOptional } from '@nestjs/swagger'
 import { Type } from 'class-transformer'
-import { IsInt, IsOptional, Max, Min } from 'class-validator'
+import { IsBoolean, IsInt, IsOptional, Max, Min } from 'class-validator'
 import { COROS_SYNC_DEFAULT_DAYS, COROS_SYNC_MAX_DAYS } from '../coros.constants'
 
 export class SyncCorosDto {
@@ -15,4 +15,13 @@ export class SyncCorosDto {
   @Min(1)
   @Max(COROS_SYNC_MAX_DAYS)
   days?: number
+
+  @ApiPropertyOptional({
+    example: false,
+    description: 'true = 从今天往前逐月翻完全部历史运动记录（轨迹仍按每日限额分批补）',
+  })
+  @IsOptional()
+  @Type(() => Boolean)
+  @IsBoolean()
+  history?: boolean
 }

@@ -48,6 +48,18 @@ const clockToSeconds = (value: string | null) => {
 
 const secondsOf = (source: string, key: string) => clockToSeconds(segment(source, key))
 
+/** `Start Coordinates: 22.555000, 113.185997` → 纬度在前、经度在后 */
+const startCoordinateOf = (source: string): { lat: number | null; lon: number | null } => {
+  const raw = segment(source, 'Start Coordinates')
+  const pair = raw?.match(/(-?\d+(?:\.\d+)?)\s*,\s*(-?\d+(?:\.\d+)?)/)
+  const lat = pair ? Number(pair[1]) : NaN
+  const lon = pair ? Number(pair[2]) : NaN
+  return {
+    lat: Number.isFinite(lat) && Math.abs(lat) <= 90 ? lat : null,
+    lon: Number.isFinite(lon) && Math.abs(lon) <= 180 ? lon : null,
+  }
+}
+
 /** "7h 48min" / "9 min" / "1h 2min" / "50 min" → 分钟 */
 const minutesOf = (source: string, key: string) => {
   const raw = segment(source, key)
@@ -89,6 +101,8 @@ export interface ParsedActivity {
   avgHr: number | null
   calories: number | null
   sets: number | null
+  startLat: number | null
+  startLon: number | null
   raw: string
 }
 
@@ -105,6 +119,7 @@ export const parseSportRecords = (text: string): ParsedActivity[] => {
       const block = body.join('\n')
       const labelId = segment(block, 'LabelId')
       if (labelId) {
+        const coordinate = startCoordinateOf(block)
         records.push({
           labelId,
           sportType: numOf(block, 'SportType'),
@@ -120,6 +135,8 @@ export const parseSportRecords = (text: string): ParsedActivity[] => {
           avgHr: numOf(block, 'Avg HR'),
           calories: numOf(block, 'Calories'),
           sets: numOf(block, 'Sets'),
+          startLat: coordinate.lat,
+          startLon: coordinate.lon,
           raw: block.trim(),
         })
       }

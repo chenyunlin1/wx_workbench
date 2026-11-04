@@ -1,4 +1,4 @@
-import { Body, Controller, Delete, Get, Post, Query, Req, Res } from '@nestjs/common'
+import { Body, Controller, Delete, Get, Param, Post, Query, Req, Res } from '@nestjs/common'
 import { ApiBearerAuth, ApiOperation, ApiQuery, ApiTags } from '@nestjs/swagger'
 import type { Request as ExpressRequest, Response as ExpressResponse } from 'express'
 import { CurrentUser } from '../common/decorators/current-user.decorator'
@@ -75,7 +75,20 @@ export class CorosController {
   @Post('sync')
   @ApiOperation({ summary: '把高驰数据拉到本地库（后台执行，进度看 status）' })
   sync(@CurrentUser('id') userId: number, @Body() dto: SyncCorosDto) {
-    return this.syncService.start(userId, dto.days)
+    return this.syncService.start(userId, dto.days, dto.history)
+  }
+
+  @Get('activities')
+  @ApiQuery({ name: 'category', required: false, example: 'running' })
+  @ApiOperation({ summary: '运动记录列表：按月分组 + 月度汇总 + 是否有轨迹' })
+  activities(@CurrentUser('id') userId: number, @Query('category') category?: string) {
+    return this.syncService.activityList(userId, category || 'running')
+  }
+
+  @Get('activities/:labelId')
+  @ApiOperation({ summary: '单条运动记录：全部指标 + GPS 轨迹折线与公里标记' })
+  activity(@CurrentUser('id') userId: number, @Param('labelId') labelId: string) {
+    return this.syncService.activityDetail(userId, labelId)
   }
 
   @Get('dashboard')

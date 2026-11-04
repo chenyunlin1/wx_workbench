@@ -87,6 +87,18 @@ export class CorosActivity {
   @Column({ name: 'sets', type: 'int', nullable: true, comment: '力量训练的组数' })
   sets: number | null
 
+  @Column({ name: 'start_lat', type: 'double', nullable: true, comment: '起点纬度，列表缩略与无轨迹时的定位' })
+  startLat: number | null
+
+  @Column({ name: 'start_lon', type: 'double', nullable: true })
+  startLon: number | null
+
+  @Column({ name: 'track_synced_at', type: 'datetime', nullable: true, comment: '轨迹取过标记；有值但没轨迹行=这份活动没有 GPS' })
+  trackSyncedAt: Date | null
+
+  @Column({ name: 'track_attempts', type: 'int', default: 0, comment: 'FIT 有每日文件数限额，取不到也只重试几次' })
+  trackAttempts: number
+
   @Column({ name: 'training_load', type: 'int', nullable: true, comment: '训练负荷 TL' })
   trainingLoad: number | null
 

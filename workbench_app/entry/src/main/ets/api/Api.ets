@@ -11,6 +11,9 @@ import {
   CollectionListResult,
   CollectionPayload,
   CollectionStats,
+  CorosStatus,
+  CorosSyncAck,
+  CorosSyncPayload,
   DashboardSummary,
   Finance,
   FinanceListResult,
@@ -30,6 +33,8 @@ import {
   LearningTask,
   LoginResult,
   PracticeResultPayload,
+  RunDetailResult,
+  RunListResult,
   Schedule,
   SchedulePayload,
   ShoppingItem,
@@ -422,6 +427,28 @@ export class Api {
 
   static deleteWorkout(id: number): Promise<SuccessFlag> {
     return Http.delete<SuccessFlag>('/workout/' + id)
+  }
+
+  /* ---------------- 跑步（高驰） ---------------- */
+
+  /** 已同步到高驰账号下的运动记录，按月分组带月度汇总 */
+  static runningActivities(category: string): Promise<RunListResult> {
+    const query: Record<string, string> = { 'category': category }
+    return Http.get<RunListResult>('/coros/activities', query)
+  }
+
+  static runningActivityDetail(labelId: string): Promise<RunDetailResult> {
+    return Http.get<RunDetailResult>('/coros/activities/' + labelId)
+  }
+
+  /** 后台发起同步：history=true 会逐月翻完全部历史，进度靠 corosStatus 轮询 */
+  static syncCoros(days: number, history: boolean): Promise<CorosSyncAck> {
+    const payload: CorosSyncPayload = { days: days, history: history }
+    return Http.post<CorosSyncAck>('/coros/sync', payload)
+  }
+
+  static corosStatus(): Promise<CorosStatus> {
+    return Http.get<CorosStatus>('/coros/status')
   }
 
   /* ---------------- 待买清单 ---------------- */

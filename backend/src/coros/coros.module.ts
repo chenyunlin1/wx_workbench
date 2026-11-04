@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common'
 import { TypeOrmModule } from '@nestjs/typeorm'
 import { CorosActivity } from './coros-activity.entity'
+import { CorosActivityTrack } from './coros-activity-track.entity'
 import { CorosConnection } from './coros-connection.entity'
 import { CorosDailyMetric } from './coros-daily-metric.entity'
 import { CorosOAuthService } from './coros-oauth.service'
@@ -10,7 +11,7 @@ import { CorosController } from './coros.controller'
 import { CorosService } from './coros.service'
 
 @Module({
-  imports: [TypeOrmModule.forFeature([CorosConnection, CorosActivity, CorosDailyMetric, CorosSnapshot])],
+  imports: [TypeOrmModule.forFeature([CorosConnection, CorosActivity, CorosActivityTrack, CorosDailyMetric, CorosSnapshot])],
   controllers: [CorosController],
   providers: [CorosService, CorosOAuthService, CorosSyncService],
   exports: [CorosService],

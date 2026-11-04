@@ -245,6 +245,134 @@ export interface WorkoutListResult {
   pageSize: number
 }
 
+/* ---------------- 跑步（高驰同步） ---------------- */
+
+/** 列表行：后端按月分组后给出缩略轨迹点（[[经度,纬度],…]），前端只管画 */
+export interface RunItem {
+  labelId: string
+  name: string | null
+  sportName: string | null
+  activityDate: string
+  startTimestamp: number | null
+  durationSeconds: number
+  distanceKm: number | null
+  paceSeconds: number | null
+  avgHr: number | null
+  calories: number | null
+  elevationGain: number | null
+  trainingLoad: number | null
+  startLat: number | null
+  startLon: number | null
+  hasTrack: boolean
+  thumb: number[][]
+}
+
+export interface RunMonth {
+  month: string
+  label: string
+  count: number
+  distanceKm: number
+  durationSeconds: number
+  items: RunItem[]
+}
+
+export interface RunListResult {
+  total: number
+  distanceKm: number
+  durationSeconds: number
+  months: RunMonth[]
+}
+
+export interface RunActivity {
+  labelId: string
+  sportType: number | null
+  sportName: string | null
+  category: string
+  activityDate: string
+  startTimestamp: number | null
+  endTimestamp: number | null
+  name: string | null
+  durationSeconds: number
+  distanceKm: number | null
+  paceSeconds: number | null
+  speedKmh: number | null
+  avgHr: number | null
+  calories: number | null
+  sets: number | null
+  startLat: number | null
+  startLon: number | null
+  trainingLoad: number | null
+  avgCadence: number | null
+  avgPower: number | null
+  elevationGain: number | null
+  bestKmSeconds: number | null
+  trainingFocus: string | null
+  performance: string | null
+}
+
+export interface RunTrackPoint {
+  lon: number
+  lat: number
+}
+
+export interface RunKmMark {
+  lon: number
+  lat: number
+  km: number
+}
+
+/** GPS 轨迹：点已抽稀到 700 个以内，bbox 是 [最小经,最小纬,最大经,最大纬] */
+export interface RunTrack {
+  points: RunTrackPoint[]
+  kmMarks: RunKmMark[]
+  bbox: number[] | null
+  pointCount: number
+  distanceMeters: number | null
+  startTime: number | null
+}
+
+export interface RunDetailResult {
+  activity: RunActivity
+  track: RunTrack | null
+}
+
+export interface CorosSyncError {
+  tool: string
+  message: string
+}
+
+export interface CorosSyncResult {
+  activities: number
+  details: number
+  tracks: number
+  daily: number
+  errors: CorosSyncError[]
+}
+
+export interface CorosSyncState {
+  status: string
+  syncedAt: string | null
+  result: CorosSyncResult | null
+}
+
+export interface CorosStatus {
+  connected: boolean
+  account: string | null
+  toolCount: number
+  sync: CorosSyncState
+}
+
+export interface CorosSyncPayload {
+  days: number
+  history: boolean
+}
+
+export interface CorosSyncAck {
+  started: boolean
+  days: number
+  history: boolean
+}
+
 /* ---------------- 待买清单 ---------------- */
 
 export interface ShoppingItem {

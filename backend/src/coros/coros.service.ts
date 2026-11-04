@@ -17,6 +17,7 @@ import {
   COROS_SYNC_STALE_MS,
   COROS_TOOL_PREFIX,
   COROS_TOOL_RESULT_MAX_CHARS,
+  COROS_TOOL_TIMEOUT_MS,
 } from './coros.constants'
 import {
   CorosConnection,
@@ -24,7 +25,7 @@ import {
   type CorosSyncReport,
   type CorosToolMeta,
 } from './coros-connection.entity'
-import { CorosOAuthService, type OAuthMetadata } from './coros-oauth.service'
+import { CorosOAuthService, type OAuthMetadata, type OAuthTokenSet } from './coros-oauth.service'
 import { McpClient, McpUnauthorizedError } from './mcp-client'
 import { unwrapToolText } from './coros-parsers'
 
@@ -34,6 +35,9 @@ export interface CorosExecution {
   ok: boolean
   text: string
 }
+
+/** 授权不可恢复（refresh_token 被吊销或过期）：同步要据此立刻收摊，别再逐条打令牌接口 */
+export class CorosAuthExpiredError extends Error {}
 
 const aliasOf = (raw: string) => {
   const prefixed = `${COROS_TOOL_PREFIX}${raw.replace(/[^a-zA-Z0-9_-]/g, '_')}`
@@ -325,11 +329,35 @@ export class CorosService {
 
   /** 同步用：按高驰原始工具名调用，返回去掉外层 JSON 引号的文本报告 */
   async callToolText(userId: number, name: string, args: Record<string, unknown> = {}) {
+    const result = await this.callToolRaw(userId, name, args)
+    return unwrapToolText(result.text)
+  }
+
+  /** 轨迹文件用：FIT 是二进制附件，文本与文件都要拿回来 */
+  async callToolFiles(userId: number, name: string, args: Record<string, unknown> = {}) {
+    const result = await this.callToolRaw(userId, name, args)
+    return { text: unwrapToolText(result.text), files: result.files }
+  }
+
+  /** 直接下载工具给出的原始 FIT 地址（不需要高驰授权头） */
+  async downloadFile(url: string): Promise<Uint8Array> {
+    const controller = new AbortController()
+    const timer = setTimeout(() => controller.abort(), COROS_TOOL_TIMEOUT_MS)
+    try {
+      const response = await fetch(url, { signal: controller.signal })
+      if (!response.ok) throw new Error(`活动文件下载失败（${response.status}）`)
+      return new Uint8Array(await response.arrayBuffer())
+    } finally {
+      clearTimeout(timer)
+    }
+  }
+
+  private async callToolRaw(userId: number, name: string, args: Record<string, unknown>) {
     const result = await this.withClient(userId, (client) => client.callTool(name, args))
     if (result.isError) {
       throw new Error(result.text.trim().slice(0, 200) || `高驰工具 ${name} 调用失败`)
     }
-    return unwrapToolText(result.text)
+    return result
   }
 
   private async discoverTools(userId: number) {
@@ -366,7 +394,7 @@ export class CorosService {
 
   private async refreshed(connection: CorosConnection) {
     if (!connection.refreshToken) {
-      throw new BadRequestException('高驰授权已过期，请重新连接账号')
+      throw new CorosAuthExpiredError('高驰授权已过期，请重新连接账号')
     }
 
     let metadata: OAuthMetadata
@@ -386,11 +414,15 @@ export class CorosService {
       }
     }
 
-    const tokens = await this.oauth.refresh(
-      metadata,
-      connection.clientId,
-      connection.refreshToken,
-    )
+    let tokens: OAuthTokenSet
+    try {
+      tokens = await this.oauth.refresh(metadata, connection.clientId, connection.refreshToken)
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error)
+      // invalid_grant 是「重新授权才能解决」，其它失败（超时、5xx）留着下次同步再试
+      if (message.includes('invalid_grant')) throw new CorosAuthExpiredError('高驰授权已失效，请重新连接账号')
+      throw error
+    }
 
     connection.accessToken = tokens.accessToken
     connection.refreshToken = tokens.refreshToken ?? connection.refreshToken
