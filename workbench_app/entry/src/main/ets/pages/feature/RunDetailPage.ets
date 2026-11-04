@@ -424,13 +424,22 @@ export struct RunDetailPage {
             .padding({ left: AppSpace.Lg, right: AppSpace.Lg })
         }
         .width('100%')
+        .height('100%')
         .padding({ bottom: PANEL_H })
         .justifyContent(FlexAlign.Center)
         .alignItems(HorizontalAlign.Center)
         .hitTestBehavior(HitTestMode.Transparent)
       }
 
-      this.dataPanel()
+      // 底部卡片：整屏容器 + 靠底对齐，卡片自身挡住地图手势
+      Column() {
+        this.dataPanel()
+      }
+      .width('100%')
+      .height('100%')
+      .justifyContent(FlexAlign.End)
+      .padding({ left: AppSpace.Sm, right: AppSpace.Sm, bottom: AppSpace.Sm })
+      .hitTestBehavior(HitTestMode.Transparent)
     }
     .width('100%')
     .height('100%')
@@ -440,12 +449,10 @@ export struct RunDetailPage {
   @Builder
   backButton() {
     Row() {
-      Text('‹')
-        .fontSize(26)
-        .fontColor('#1F2937')
-        .fontWeight(FontWeight.Bold)
+      SymbolGlyph($r('sys.symbol.chevron_left'))
+        .fontSize(24)
+        .fontColor(['#1F2937'])
         .width(26)
-        .textAlign(TextAlign.Center)
     }
     .width(FLOAT_BTN)
     .height(FLOAT_BTN)
@@ -569,7 +576,6 @@ export struct RunDetailPage {
     .backgroundColor($r('sys.color.comp_background_primary'))
     .borderRadius({ topLeft: AppRadius.Xl, topRight: AppRadius.Xl })
     .shadow({ radius: 16, color: '#22000000', offsetY: -4 })
-    .margin({ left: AppSpace.Sm, right: AppSpace.Sm, bottom: AppSpace.Sm })
     .hitTestBehavior(HitTestMode.Block)
   }
 }

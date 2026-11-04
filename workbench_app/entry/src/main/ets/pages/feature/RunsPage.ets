@@ -41,15 +41,15 @@ struct TrackThumb {
       maxV = Math.max(maxV, v)
     }
 
-    // 下限避免单点或极短轨迹把整条线拉满格子
+    // 经度先归一到「世界宽度的比例」，纵向用墨卡托比例，两者同为 0~1 的世界比例，
+    // 和详情页的底图是同一套投影，路形才不会被横向拉长
     const pad = 10
-    const spanLon = Math.max(maxLon - minLon, 0.0004)
-    // 纵向用墨卡托比例，和详情页的底图同一套投影，否则低纬度处的路会被横向拉长
-    const spanV = Math.max(maxV - minV, 0.0002)
-    const scale = Math.min((width - pad * 2) / spanLon, (height - pad * 2) / spanV)
-    const offsetX = (width - spanLon * scale) / 2
+    const spanX = Math.max((maxLon - minLon) / 360, 1e-7)
+    const spanV = Math.max(maxV - minV, 1e-7)
+    const scale = Math.min((width - pad * 2) / spanX, (height - pad * 2) / spanV)
+    const offsetX = (width - spanX * scale) / 2
     const offsetY = (height - spanV * scale) / 2
-    const xOf = (lon: number): number => offsetX + (lon - minLon) * scale
+    const xOf = (lon: number): number => offsetX + ((lon - minLon) / 360) * scale
     const yOf = (lat: number): number => offsetY + (maxV - MapGeo.mercV(lat)) * scale
 
     ctx.lineJoin = 'round'
