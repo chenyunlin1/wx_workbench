@@ -99,10 +99,6 @@ export struct RunDetailPage {
   @Local viewW: number = 0;
   @Local viewH: number = 0;
   @Local panelH: number = CARD_MIN_H;
-  @Local hrChartW: number = 0;
-  @Local hrChartH: number = CHART_H;
-  @Local eleChartW: number = 0;
-  @Local eleChartH: number = CHART_H;
   private fitted: boolean = false;
 
   aboutToAppear(): void {
@@ -245,10 +241,17 @@ export struct RunDetailPage {
     return Math.max(1, seconds / 60)
   }
 
+  /**
+   * 图表宽度：整屏宽 − 卡片左右外边距 24 − 内容内边距 32 − 纵轴刻度列 34。
+   * 直接从屏宽推出来而不是量布局，才能保证 Path 与 Polyline 用同一套坐标。
+   */
+  private chartWidth(): number {
+    return Math.max(120, this.viewW - 90)
+  }
+
   /** 曲线点 → 画布坐标 */
   private chartPoints(series: number[][], minV: number, maxV: number, xMax: number,
-    width: number, height: number): number[][] {
-    if (width <= 0 || height <= 0 || series.length === 0) {
+    width: number, height: number): number[][] {    if (width <= 0 || height <= 0 || series.length === 0) {
       return []
     }
     const innerW = width - CHART_PAD_L - CHART_PAD_R
@@ -264,19 +267,23 @@ export struct RunDetailPage {
   }
 
   /** 折线下方的填充路径 */
-  private areaPath(series: number[][], minV: number, maxV: number, xMax: number,
-    width: number, height: number): string {
+  /**
+   * 面积图的填充多边形：曲线 + 两端落到底线。
+   * 不用 Path.commands —— 宽度变化时 Path 会留下上一帧的残影（截图里那条黑线）。
+   */
+  private areaPoints(series: number[][], minV: number, maxV: number, xMax: number,
+    width: number, height: number): number[][] {
     const points = this.chartPoints(series, minV, maxV, xMax, width, height)
     if (points.length === 0) {
-      return ''
+      return []
     }
     const bottom = height - CHART_PAD_B
-    let path = `M${points[0][0].toFixed(1)},${bottom.toFixed(1)}`
+    const polygon: number[][] = [[points[0][0], bottom]]
     for (const point of points) {
-      path += ` L${point[0].toFixed(1)},${point[1].toFixed(1)}`
+      polygon.push(point)
     }
-    path += ` L${points[points.length - 1][0].toFixed(1)},${bottom.toFixed(1)} Z`
-    return path
+    polygon.push([points[points.length - 1][0], bottom])
+    return polygon
   }
 
   private hrRange(): number[] {
@@ -512,6 +519,7 @@ export struct RunDetailPage {
           // 先描一条深色底线，影像底图上黄色线才不会糊掉
           Polyline({ width: this.viewW, height: this.viewH })
             .points(this.trackPolyline())
+            .fill('#00000000')
             .stroke('#00000073')
             .strokeWidth(8)
             .strokeLineCap(LineCapStyle.Round)
@@ -521,6 +529,7 @@ export struct RunDetailPage {
 
           Polyline({ width: this.viewW, height: this.viewH })
             .points(this.trackPolyline())
+            .fill('#00000000')
             .stroke(RunStyle.TRACK)
             .strokeWidth(4)
             .strokeLineCap(LineCapStyle.Round)
@@ -531,17 +540,15 @@ export struct RunDetailPage {
           if (this.showMarks) {
             ForEach(this.marks, (mark: RunKmMark) => {
               Stack() {
-                Circle({ width: 20, height: 20 })
+                Circle({ width: 16, height: 16 })
                   .fill(RunStyle.MARK_FILL)
-                  .stroke(RunStyle.MARK_EDGE)
-                  .strokeWidth(1)
                 Text(mark.km.toString())
-                  .fontSize(11)
+                  .fontSize(10)
                   .fontColor(RunStyle.MARK_TEXT)
               }
-              .width(20)
-              .height(20)
-              .position({ x: this.screenX(mark.lon) - 10, y: this.screenY(mark.lat) - 10 })
+              .width(16)
+              .height(16)
+              .position({ x: this.screenX(mark.lon) - 8, y: this.screenY(mark.lat) - 8 })
               .hitTestBehavior(HitTestMode.None)
             }, (mark: RunKmMark) => mark.km.toString())
           }
@@ -670,14 +677,15 @@ export struct RunDetailPage {
         .hitTestBehavior(HitTestMode.Transparent)
       }
 
-      // 底部数据卡
+      // 底部数据卡：容器只占卡片本身的范围，默认命中测试会挡住下面的地图，
+      // 卡片里的 Scroll 才能拿到纵向滑动（整屏 Transparent 容器会让地图平移抢走手势）
       Column() {
         this.dataCard()
       }
       .width('100%')
-      .height('100%')
-      .justifyContent(FlexAlign.End)
-      .hitTestBehavior(HitTestMode.Transparent)
+      .height(this.panelH)
+      .padding({ left: 12, right: 12 })
+      .position({ x: 0, y: this.viewH - this.panelH - 12 })
     }
     .width('100%')
     .height('100%')
@@ -756,7 +764,7 @@ export struct RunDetailPage {
           this.shareButton()
         }
         .width('100%')
-        .padding({ left: AppSpace.Md, right: AppSpace.Md, bottom: AppSpace.Xl })
+        .padding({ left: AppSpace.Md, right: AppSpace.Md, top: AppSpace.Md, bottom: AppSpace.Xl })
       }
       .scrollBar(BarState.Off)
       .align(Alignment.Top)
@@ -766,39 +774,34 @@ export struct RunDetailPage {
     .width('100%')
     .height(this.panelH)
     .backgroundColor($r('sys.color.comp_background_primary'))
-    .borderRadius({ topLeft: AppRadius.Xl, topRight: AppRadius.Xl })
-    .shadow({ radius: 18, color: '#26000000', offsetY: -4 })
-    .hitTestBehavior(HitTestMode.Block)
+    .borderRadius(AppRadius.Lg)
+    .clip(true)
+    .shadow({ radius: 18, color: '#26000000', offsetY: 2 })
   }
 
-  /** 卡片顶部：项目标签 + 标题 + 时间 */
+  /** 卡片顶部：项目标签 + 标题 + 时间（标题与时间同一行，放在最上面） */
   @Builder
   cardHeader() {
-    Row() {
-      Column({ space: 6 }) {
-        Text(this.sportText)
-          .fontSize(11)
-          .fontColor('#FFFFFF')
-          .padding({ left: 8, right: 8, top: 3, bottom: 3 })
-          .borderRadius(6)
-          .backgroundColor(RUN_GREEN_DEEP)
-        Text(this.titleText)
-          .fontSize(AppFont.TitleL)
-          .fontWeight(FontWeight.Bold)
-          .fontColor($r('sys.color.font_primary'))
-          .maxLines(1)
-          .textOverflow({ overflow: TextOverflow.Ellipsis })
-      }
-      .alignItems(HorizontalAlign.Start)
-      .layoutWeight(1)
-
+    Row({ space: AppSpace.Xs }) {
+      Text(this.sportText)
+        .fontSize(11)
+        .fontColor('#FFFFFF')
+        .padding({ left: 8, right: 8, top: 3, bottom: 3 })
+        .borderRadius(6)
+        .backgroundColor(RUN_GREEN_DEEP)
+      Text(this.titleText)
+        .fontSize(18)
+        .fontWeight(FontWeight.Bold)
+        .fontColor($r('sys.color.font_primary'))
+        .maxLines(1)
+        .textOverflow({ overflow: TextOverflow.Ellipsis })
+        .layoutWeight(1)
       Text(this.subtitleText)
         .fontSize(12)
         .fontColor($r('sys.color.font_secondary'))
     }
     .width('100%')
     .alignItems(VerticalAlign.Center)
-    .margin({ top: AppSpace.Xs })
   }
 
   /** 大号距离 + 快慢渐变条 */
@@ -1032,9 +1035,10 @@ export struct RunDetailPage {
               .position({ x: 0, y: this.axisY(index) - 6 })
           }, (label: string) => label)
 
-          Polyline({ width: this.hrChartW, height: this.hrChartH })
+          Polyline({ width: this.chartWidth(), height: CHART_H })
             .points(this.chartPoints(this.hrSeries(), this.hrRange()[0], this.hrRange()[1],
-              this.totalMinutes(), this.hrChartW, this.hrChartH))
+              this.totalMinutes(), this.chartWidth(), CHART_H))
+            .fill('#00000000')
             .stroke('#E5484D')
             .strokeWidth(2)
             .strokeLineCap(LineCapStyle.Round)
@@ -1048,22 +1052,16 @@ export struct RunDetailPage {
               .fontColor($r('sys.color.font_tertiary'))
               .width(28)
               .textAlign(TextAlign.Center)
-              .position({ x: 34 + this.axisX(index) - 14, y: this.hrChartH - CHART_PAD_B + 2 })
+              .position({ x: 34 + this.axisX(index) - 14, y: CHART_H - CHART_PAD_B + 2 })
           }, (label: string) => label)
 
           Text('分钟')
             .fontSize(9)
             .fontColor('#E5484D')
-            .position({ x: this.hrChartW + 20, y: this.hrChartH - CHART_PAD_B + 2 })
+            .position({ x: this.chartWidth() + 20, y: CHART_H - CHART_PAD_B + 2 })
         }
         .width('100%')
-        .height(this.hrChartH)
-        .onSizeChange((_oldValue: SizeOptions, newValue: SizeOptions) => {
-          if (typeof newValue.width === 'number' && typeof newValue.height === 'number') {
-            this.hrChartW = newValue.width - 34
-            this.hrChartH = newValue.height
-          }
-        })
+        .height(CHART_H)
       }
     }
     .width('100%')
@@ -1107,16 +1105,19 @@ export struct RunDetailPage {
               .position({ x: 0, y: this.axisY(index) - 6 })
           }, (label: string) => label)
 
-          Path({ width: this.eleChartW, height: this.eleChartH })
-            .commands(this.areaPath(this.elevationSeries(), this.elevationRange()[0], this.elevationRange()[1],
-              this.totalMinutes(), this.eleChartW, this.eleChartH))
+          Polyline({ width: this.chartWidth(), height: CHART_H })
+            .points(this.areaPoints(this.elevationSeries(), this.elevationRange()[0], this.elevationRange()[1],
+              this.totalMinutes(), this.chartWidth(), CHART_H))
             .fill('#33A0E070')
+            .stroke('#00000000')
+            .strokeWidth(0)
             .position({ x: 34, y: 0 })
             .hitTestBehavior(HitTestMode.None)
 
-          Polyline({ width: this.eleChartW, height: this.eleChartH })
+          Polyline({ width: this.chartWidth(), height: CHART_H })
             .points(this.chartPoints(this.elevationSeries(), this.elevationRange()[0], this.elevationRange()[1],
-              this.totalMinutes(), this.eleChartW, this.eleChartH))
+              this.totalMinutes(), this.chartWidth(), CHART_H))
+            .fill('#00000000')
             .stroke(RUN_GREEN_DEEP)
             .strokeWidth(2)
             .strokeLineCap(LineCapStyle.Round)
@@ -1130,22 +1131,16 @@ export struct RunDetailPage {
               .fontColor($r('sys.color.font_tertiary'))
               .width(28)
               .textAlign(TextAlign.Center)
-              .position({ x: 34 + this.axisX(index) - 14, y: this.eleChartH - CHART_PAD_B + 2 })
+              .position({ x: 34 + this.axisX(index) - 14, y: CHART_H - CHART_PAD_B + 2 })
           }, (label: string) => label)
 
           Text('分钟')
             .fontSize(9)
             .fontColor(RUN_GREEN_DEEP)
-            .position({ x: this.eleChartW + 20, y: this.eleChartH - CHART_PAD_B + 2 })
+            .position({ x: this.chartWidth() + 20, y: CHART_H - CHART_PAD_B + 2 })
         }
         .width('100%')
-        .height(this.eleChartH)
-        .onSizeChange((_oldValue: SizeOptions, newValue: SizeOptions) => {
-          if (typeof newValue.width === 'number' && typeof newValue.height === 'number') {
-            this.eleChartW = newValue.width - 34
-            this.eleChartH = newValue.height
-          }
-        })
+        .height(CHART_H)
       }
     }
     .width('100%')
@@ -1255,12 +1250,12 @@ export struct RunDetailPage {
     }
     const total = Math.ceil(this.totalMinutes())
     const value = Number(labels[index])
-    return value / Math.max(1, total) * (this.hrChartW - CHART_PAD_L - CHART_PAD_R)
+    return value / Math.max(1, total) * (this.chartWidth() - CHART_PAD_L - CHART_PAD_R)
   }
 
   /** 纵轴刻度的 y 坐标 */
   private axisY(index: number): number {
-    const innerH = this.hrChartH - CHART_PAD_T - CHART_PAD_B
+    const innerH = CHART_H - CHART_PAD_T - CHART_PAD_B
     const steps = 3
     return CHART_PAD_T + (index / steps) * innerH
   }
